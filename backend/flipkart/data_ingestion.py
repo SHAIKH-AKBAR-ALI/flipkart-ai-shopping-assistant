@@ -1,6 +1,6 @@
 from collections import Counter
 
-from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_astradb import AstraDBVectorStore
 from tqdm import tqdm
 
@@ -10,9 +10,8 @@ from flipkart.data_converter import load_documents
 
 class DataIngestor:
     def __init__(self):
-        self._embeddings = OpenAIEmbeddings(
-            model=config.EMBEDDING_MODEL,
-            api_key=config.OPENAI_API_KEY,
+        self._embeddings = HuggingFaceEmbeddings(
+            model_name=config.EMBEDDING_MODEL
         )
 
     def _get_vector_store(self) -> AstraDBVectorStore:

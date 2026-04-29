@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 
 from langchain_core.documents import Document
 from langchain_groq import ChatGroq
-from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_astradb import AstraDBVectorStore
 from rank_bm25 import BM25Okapi
 from sentence_transformers import CrossEncoder
@@ -44,9 +44,8 @@ class HybridRetriever:
         self.documents = documents
         self.use_hyde = use_hyde
 
-        self._embeddings = OpenAIEmbeddings(
-            model=config.EMBEDDING_MODEL,
-            api_key=config.OPENAI_API_KEY,
+        self._embeddings = HuggingFaceEmbeddings(
+            model_name=config.EMBEDDING_MODEL
         )
         self._llm = ChatGroq(
             model=config.LLM_MODEL,
