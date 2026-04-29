@@ -12,6 +12,7 @@ langchain-core
 langchain-community
 langchain-openai
 langchain-astradb
+langchain-groq
 
 # OpenAI
 openai
