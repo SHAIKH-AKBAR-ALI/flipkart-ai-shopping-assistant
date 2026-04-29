@@ -9,16 +9,28 @@ const LandingPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let cancelled = false;
     const fetchCategories = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/categories`);
-        const data = await response.json();
-        setCategories(data.categories || []);
-      } catch (error) {
-        console.error('Error fetching categories:', error);
+      for (let attempt = 0; attempt < 10; attempt++) {
+        try {
+          const response = await fetch(`${API_BASE}/categories`);
+          const data = await response.json();
+          const cats = data.categories || [];
+          if (cancelled) return;
+          if (cats.length > 0) {
+            setCategories(cats);
+            return;
+          }
+          // Backend still initializing — wait and retry
+          await new Promise((r) => setTimeout(r, 6000));
+        } catch (error) {
+          console.error('Error fetching categories:', error);
+          await new Promise((r) => setTimeout(r, 6000));
+        }
       }
     };
     fetchCategories();
+    return () => { cancelled = true; };
   }, []);
 
   const totalProducts = categories.reduce((acc, cat) => acc + (cat.count || 0), 0);

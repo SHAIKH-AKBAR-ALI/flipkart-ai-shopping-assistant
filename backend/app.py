@@ -1,9 +1,11 @@
 import asyncio
+import logging
+import os
 from collections import Counter
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import BackgroundTasks, FastAPI
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
@@ -14,7 +16,8 @@ from flipkart.data_ingestion import DataIngestor
 from flipkart.evaluator import RAGEvaluator
 from flipkart.session_store import SessionStore
 
-# Maps UI category ids → internal category names used in metadata
+logger = logging.getLogger(__name__)
+
 _CATEGORY_ID_MAP = {
     "laptop": "Laptop",
     "mobile": "Mobile",
@@ -31,42 +34,54 @@ def _resolve_category(raw: Optional[str]) -> Optional[str]:
     return _CATEGORY_ID_MAP.get(raw.lower(), raw)
 
 
-# ── Startup / shutdown ─────────────────────────────────────────────────────────
+# ── Background initializer ─────────────────────────────────────────────────────
+
+async def _initialize_app(app: FastAPI) -> None:
+    """Run heavy init in thread pool so the server can serve /health immediately."""
+    try:
+        loop = asyncio.get_event_loop()
+
+        logger.info("Loading CSV documents...")
+        documents = await loop.run_in_executor(None, load_documents)
+
+        logger.info("Connecting to AstraDB vector store...")
+        vector_store = await loop.run_in_executor(
+            None, lambda: DataIngestor().ingest(load_existing=True)
+        )
+
+        logger.info("Building FlipkartAgent (loads embeddings + reranker)...")
+        agent = await loop.run_in_executor(
+            None, lambda: FlipkartAgent(vector_store=vector_store, documents=documents)
+        )
+
+        app.state.agent = agent
+        app.state.evaluator = RAGEvaluator()
+        app.state.session_store = SessionStore()
+        app.state.category_counts = Counter(doc.metadata["category"] for doc in documents)
+        app.state.ready = True
+
+        logger.info(f"Startup complete. {len(documents)} docs loaded for BM25.")
+    except Exception:
+        logger.exception("Background initialization failed.")
+        app.state.ready = False
+
+
+# ── Lifespan ───────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Lightweight state only — expensive init is deferred to first request
+    # Seed state immediately so every endpoint has safe attribute access
+    app.state.ready = False
     app.state.agent = None
     app.state.evaluator = None
-    app.state.session_store = SessionStore()
+    app.state.session_store = None
     app.state.chat_count = 0
     app.state.category_counts = Counter()
 
-    print("Startup complete. Agent will be initialized on first request.")
+    # Heavy init runs in background — server accepts /health right away
+    asyncio.create_task(_initialize_app(app))
+
     yield
-
-
-# ── Lazy initializer ───────────────────────────────────────────────────────────
-
-def _get_or_init_agent() -> FlipkartAgent:
-    """Initialize the agent, vector store, and evaluator on first use.
-
-    Subsequent calls return the already-cached instances from app.state,
-    so the expensive embedding model load and AstraDB connection only
-    happen once — on the first real API request, not during startup.
-    """
-    if app.state.agent is None:
-        print("Lazy init: loading documents and initializing agent...")
-        documents = load_documents()
-        vector_store = DataIngestor().ingest(load_existing=True)
-
-        app.state.agent = FlipkartAgent(vector_store=vector_store, documents=documents)
-        app.state.evaluator = RAGEvaluator()
-        app.state.category_counts = Counter(doc.metadata["category"] for doc in documents)
-
-        print(f"Lazy init complete. {len(documents)} docs loaded for BM25.")
-
-    return app.state.agent
 
 
 # ── App ────────────────────────────────────────────────────────────────────────
@@ -107,7 +122,6 @@ class AnalyzeRequest(BaseModel):
 # ── Background RAGAS task ──────────────────────────────────────────────────────
 
 def _fire_ragas(evaluator: RAGEvaluator, query: str, answer: str, contexts: list[str]):
-    """Scheduled as a FastAPI background task — runs after response is sent."""
     asyncio.run(evaluator.evaluate_async(query, answer, contexts))
 
 
@@ -115,12 +129,13 @@ def _fire_ragas(evaluator: RAGEvaluator, query: str, answer: str, contexts: list
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "ready": app.state.ready}
 
 
 @app.get("/categories")
 def categories():
-    _get_or_init_agent()
+    if not app.state.ready:
+        return {"categories": []}
     counts = app.state.category_counts
     return {
         "categories": [
@@ -136,7 +151,10 @@ def categories():
 
 @app.post("/chat")
 async def chat(req: ChatRequest, background_tasks: BackgroundTasks):
-    agent: FlipkartAgent = _get_or_init_agent()
+    if not app.state.ready:
+        raise HTTPException(status_code=503, detail="Service is initializing. Retry in ~60 seconds.")
+
+    agent: FlipkartAgent = app.state.agent
     evaluator: RAGEvaluator = app.state.evaluator
 
     app.state.chat_count += 1
@@ -144,12 +162,12 @@ async def chat(req: ChatRequest, background_tasks: BackgroundTasks):
 
     category = _resolve_category(req.category)
     filters = req.filters.model_dump() if req.filters else None
-    
+
     response = agent.run(
-        query=req.query, 
-        session_id=req.session_id, 
+        query=req.query,
+        session_id=req.session_id,
         category=category,
-        filters=filters
+        filters=filters,
     )
 
     if "rag_trace" not in response:
@@ -166,7 +184,9 @@ async def chat(req: ChatRequest, background_tasks: BackgroundTasks):
 
 @app.post("/analyze")
 async def analyze(req: AnalyzeRequest):
-    agent: FlipkartAgent = _get_or_init_agent()
+    if not app.state.ready:
+        raise HTTPException(status_code=503, detail="Service is initializing. Retry in ~60 seconds.")
+    agent: FlipkartAgent = app.state.agent
     category = _resolve_category(req.category)
     result = agent.analyze_product(product_name=req.product_name, category=category or req.category)
     return result
@@ -182,4 +202,5 @@ def clear_session(session_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=True)
