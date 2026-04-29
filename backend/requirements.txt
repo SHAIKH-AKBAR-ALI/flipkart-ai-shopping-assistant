@@ -24,8 +24,8 @@ astrapy
 rank-bm25
 
 # Reranker
-torch==2.0.1+cpu
-sentence-transformers==2.2.2
+torch==2.2.1+cpu
+sentence-transformers==2.6.1
 
 # Search tool
 duckduckgo-search
