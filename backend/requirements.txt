@@ -42,6 +42,6 @@ prometheus-fastapi-instrumentator
 
 # Utils
 pandas
-numpy
+numpy<2
 pydantic
 tqdm
