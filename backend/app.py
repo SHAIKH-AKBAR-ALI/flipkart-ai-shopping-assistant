@@ -35,17 +35,38 @@ def _resolve_category(raw: Optional[str]) -> Optional[str]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    documents = load_documents()
-    vector_store = DataIngestor().ingest(load_existing=True)
-
-    app.state.agent = FlipkartAgent(vector_store=vector_store, documents=documents)
-    app.state.evaluator = RAGEvaluator()
+    # Lightweight state only — expensive init is deferred to first request
+    app.state.agent = None
+    app.state.evaluator = None
     app.state.session_store = SessionStore()
     app.state.chat_count = 0
-    app.state.category_counts = Counter(doc.metadata["category"] for doc in documents)
+    app.state.category_counts = Counter()
 
-    print(f"Startup complete. {len(documents)} docs loaded for BM25.")
+    print("Startup complete. Agent will be initialized on first request.")
     yield
+
+
+# ── Lazy initializer ───────────────────────────────────────────────────────────
+
+def _get_or_init_agent() -> FlipkartAgent:
+    """Initialize the agent, vector store, and evaluator on first use.
+
+    Subsequent calls return the already-cached instances from app.state,
+    so the expensive embedding model load and AstraDB connection only
+    happen once — on the first real API request, not during startup.
+    """
+    if app.state.agent is None:
+        print("Lazy init: loading documents and initializing agent...")
+        documents = load_documents()
+        vector_store = DataIngestor().ingest(load_existing=True)
+
+        app.state.agent = FlipkartAgent(vector_store=vector_store, documents=documents)
+        app.state.evaluator = RAGEvaluator()
+        app.state.category_counts = Counter(doc.metadata["category"] for doc in documents)
+
+        print(f"Lazy init complete. {len(documents)} docs loaded for BM25.")
+
+    return app.state.agent
 
 
 # ── App ────────────────────────────────────────────────────────────────────────
@@ -99,6 +120,7 @@ def health():
 
 @app.get("/categories")
 def categories():
+    _get_or_init_agent()
     counts = app.state.category_counts
     return {
         "categories": [
@@ -114,7 +136,7 @@ def categories():
 
 @app.post("/chat")
 async def chat(req: ChatRequest, background_tasks: BackgroundTasks):
-    agent: FlipkartAgent = app.state.agent
+    agent: FlipkartAgent = _get_or_init_agent()
     evaluator: RAGEvaluator = app.state.evaluator
 
     app.state.chat_count += 1
@@ -144,7 +166,7 @@ async def chat(req: ChatRequest, background_tasks: BackgroundTasks):
 
 @app.post("/analyze")
 async def analyze(req: AnalyzeRequest):
-    agent: FlipkartAgent = app.state.agent
+    agent: FlipkartAgent = _get_or_init_agent()
     category = _resolve_category(req.category)
     result = agent.analyze_product(product_name=req.product_name, category=category or req.category)
     return result
