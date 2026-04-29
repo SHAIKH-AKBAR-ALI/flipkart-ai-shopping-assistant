@@ -26,7 +26,6 @@ dist/
 .eslintcache
 
 # Project Specific
-backend/data/*.csv
 backend/data/*.json
 !backend/data/processed/
 

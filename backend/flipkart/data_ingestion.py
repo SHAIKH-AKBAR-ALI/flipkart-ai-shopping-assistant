@@ -2,6 +2,7 @@ from collections import Counter
 
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_astradb import AstraDBVectorStore
+from langchain_astradb.utils.astradb import SetupMode
 from tqdm import tqdm
 
 from flipkart import config
@@ -14,21 +15,20 @@ class DataIngestor:
             model_name=config.EMBEDDING_MODEL
         )
 
-    def _get_vector_store(self) -> AstraDBVectorStore:
+    def _get_vector_store(self, setup_mode: SetupMode = SetupMode.SYNC) -> AstraDBVectorStore:
         return AstraDBVectorStore(
             embedding=self._embeddings,
             collection_name=config.ASTRA_DB_COLLECTION,
             api_endpoint=config.ASTRA_DB_API_ENDPOINT,
             token=config.ASTRA_DB_APPLICATION_TOKEN,
             namespace=config.ASTRA_DB_KEYSPACE,
+            setup_mode=setup_mode,
         )
 
     def ingest(self, load_existing: bool = True) -> AstraDBVectorStore:
-        vector_store = self._get_vector_store()
-
         if load_existing:
             print("Loading existing vector store — skipping ingestion.")
-            return vector_store
+            return self._get_vector_store(setup_mode=SetupMode.OFF)
 
         print("Clearing existing collection...")
         try:
