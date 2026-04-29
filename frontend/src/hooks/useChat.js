@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = 'https://flipkart-ai-shopping-assistant-production.up.railway.app'
 
 const getSessionId = () => {
   const key = 'flipkart-session-id'

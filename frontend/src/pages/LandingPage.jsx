@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://flipkart-ai-shopping-assistant-production.up.railway.app';
 
 const LandingPage = () => {
   const [categories, setCategories] = useState([]);
