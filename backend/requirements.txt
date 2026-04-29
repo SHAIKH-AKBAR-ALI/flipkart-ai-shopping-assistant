@@ -1,3 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 # Core
 fastapi
 uvicorn
@@ -22,7 +23,6 @@ astrapy
 rank-bm25
 
 # Reranker
---extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.0.1+cpu
 sentence-transformers==2.2.2
 
