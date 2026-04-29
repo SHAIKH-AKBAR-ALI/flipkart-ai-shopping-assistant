@@ -1,0 +1,44 @@
+# Core
+fastapi
+uvicorn
+python-multipart
+sse-starlette
+python-dotenv
+
+# LangChain
+langchain
+langchain-core
+langchain-community
+langchain-openai
+langchain-astradb
+
+# OpenAI
+openai
+
+# Vector DB
+astrapy
+
+# BM25
+rank-bm25
+
+# Reranker
+sentence-transformers
+
+# Search tool
+duckduckgo-search
+
+# Evaluation
+ragas
+
+# Session storage
+sqlalchemy
+
+# Monitoring
+prometheus-client
+prometheus-fastapi-instrumentator
+
+# Utils
+pandas
+numpy
+pydantic
+tqdm

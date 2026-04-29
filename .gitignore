@@ -1,0 +1,35 @@
+# Environments
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.toast
+.build
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+dist/
+.npm
+.eslintcache
+
+# Project Specific
+backend/data/*.csv
+backend/data/*.json
+!backend/data/processed/
+
+# OS files
+.DS_Store
+Thumbs.db
