@@ -1,0 +1,98 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { CATEGORIES, categoryFromSlug } from '../../lib/categories.js';
+
+export function getStaticPaths() {
+  return CATEGORIES.map((c) => ({ params: { category: c.slug } }));
+}
+
+const { category: slug } = Astro.params;
+const category = categoryFromSlug(slug);
+
+if (!category) {
+  return Astro.redirect('/');
+}
+---
+
+<Layout title={`${category.label} — Flipkart Assist`}>
+	<div class="mx-auto flex h-screen max-w-4xl flex-col px-4 py-6 sm:px-6">
+		<header class="mb-4 flex items-center justify-between border-b border-border-soft pb-4">
+			<div>
+				<a href="/" class="text-xs font-medium uppercase tracking-widest text-coral hover:text-coral-dark">
+					← Flipkart Assist
+				</a>
+				<h1 class="font-display text-2xl text-ink">{category.label}</h1>
+			</div>
+			<div class="flex items-center gap-3">
+				<label class="text-xs text-ink-soft" for="category-switch">Switch</label>
+				<select
+					id="category-switch"
+					class="rounded-lg border border-border-soft bg-paper px-2 py-1.5 text-sm text-ink focus:border-coral focus:outline-none"
+				>
+					{CATEGORIES.map((c) => (
+						<option value={c.slug} selected={c.slug === category.slug}>{c.label}</option>
+					))}
+				</select>
+				<button
+					id="new-conversation"
+					class="rounded-lg border border-border-soft bg-paper px-3 py-1.5 text-sm font-medium text-ink-soft transition-colors hover:border-coral hover:text-coral-dark"
+				>
+					New conversation
+				</button>
+			</div>
+		</header>
+
+		<div id="error-banner" class="mb-4 hidden items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+			<span id="error-text"></span>
+			<button id="error-retry" class="ml-4 shrink-0 rounded-lg border border-red-300 px-3 py-1 text-xs font-medium hover:bg-red-100">
+				Retry
+			</button>
+		</div>
+
+		<main id="chat-messages" class="flex-1 space-y-4 overflow-y-auto pb-4 pr-1"></main>
+
+		<div id="typing-indicator" class="mb-2 hidden text-xs text-ink-soft">Assistant is typing…</div>
+
+		<form id="chat-form" class="flex items-end gap-3 border-t border-border-soft pt-4">
+			<textarea
+				id="chat-input"
+				rows="1"
+				placeholder={`Ask about ${category.label.toLowerCase()}…`}
+				class="flex-1 resize-none rounded-xl border border-border-soft bg-paper px-4 py-3 text-sm text-ink focus:border-coral focus:outline-none"
+			></textarea>
+			<button
+				id="chat-send"
+				type="submit"
+				class="rounded-xl bg-coral px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-coral-dark disabled:cursor-not-allowed disabled:opacity-60"
+			>
+				Send
+			</button>
+		</form>
+	</div>
+
+	<script define:vars={{ categoryLabel: category.label, categorySlug: category.slug }}>
+		window.__CHAT_CONTEXT__ = { categoryLabel, categorySlug };
+	</script>
+	<script>
+		import { initChatApp } from '../../lib/chat-app.js';
+
+		const { categoryLabel, categorySlug } = window.__CHAT_CONTEXT__;
+
+		initChatApp({
+			categoryLabel,
+			seedMessage: `I'm looking for ${categoryLabel.toLowerCase()}.`,
+		});
+
+		document.getElementById('category-switch').addEventListener('change', (e) => {
+			window.location.href = `/chat/${e.target.value}`;
+		});
+
+		const textarea = document.getElementById('chat-input');
+		textarea.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter' && !e.shiftKey) {
+				e.preventDefault();
+				document.getElementById('chat-form').requestSubmit();
+			}
+		});
+	</script>
+</Layout>

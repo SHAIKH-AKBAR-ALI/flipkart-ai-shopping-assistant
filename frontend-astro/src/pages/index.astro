@@ -1,0 +1,54 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const categories = [
+  { slug: 'laptops', label: 'Laptops', blurb: 'Power for work, code, and everything after' },
+  { slug: 'mobiles', label: 'Mobiles', blurb: 'Cameras, chipsets, and everyday carry' },
+  { slug: 'tvs', label: 'TVs', blurb: 'Screens built for movie night' },
+  { slug: 'refrigerators', label: 'Refrigerators', blurb: 'Cool, quiet, and built to last' },
+  { slug: 'smart-watches', label: 'Smart Watches', blurb: 'Fitness and notifications on your wrist' },
+  { slug: 'washing-machines', label: 'Washing Machines', blurb: 'Laundry day, simplified' },
+];
+---
+
+<Layout title="Flipkart Assist — Shop with an expert, not a search bar">
+	<main class="mx-auto flex min-h-screen max-w-5xl flex-col px-6 py-16 sm:py-24">
+		<header class="mb-16 max-w-2xl">
+			<p class="mb-4 font-body text-sm font-medium uppercase tracking-widest text-coral">
+				Flipkart Assist
+			</p>
+			<h1 class="font-display text-4xl leading-tight text-ink sm:text-5xl">
+				Shop like you've got a friend who knows the specs.
+			</h1>
+			<p class="mt-5 text-lg leading-relaxed text-ink-soft">
+				Ask about pricing, compare features, or just say the word and we'll get it booked.
+				Our sales, technical, and booking agents work the conversation together — pick a
+				category to start.
+			</p>
+		</header>
+
+		<section aria-label="Product categories">
+			<h2 class="mb-6 font-display text-xl text-ink-soft">What are you shopping for?</h2>
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+				{categories.map((c) => (
+					<a
+						href={`/chat/${c.slug}`}
+						class="group rounded-2xl border border-border-soft bg-paper p-6 transition-colors hover:border-coral hover:bg-coral-soft/40"
+					>
+						<h3 class="font-display text-xl text-ink group-hover:text-coral-dark">
+							{c.label}
+						</h3>
+						<p class="mt-2 text-sm text-ink-soft">{c.blurb}</p>
+						<span class="mt-4 inline-block text-sm font-medium text-coral group-hover:translate-x-1 transition-transform">
+							Start chatting →
+						</span>
+					</a>
+				))}
+			</div>
+		</section>
+
+		<footer class="mt-20 text-sm text-ink-soft">
+			Multi-agent assistant · Sales, Technical &amp; Booking agents collaborate on every reply.
+		</footer>
+	</main>
+</Layout>
