@@ -28,6 +28,7 @@ dist/
 # Project Specific
 backend/data/*.json
 !backend/data/processed/
+backend/data/sessions_v2.db
 
 # OS files
 .DS_Store
