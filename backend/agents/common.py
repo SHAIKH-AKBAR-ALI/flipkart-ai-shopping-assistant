@@ -21,11 +21,21 @@ _BRAND_WORDS = {b.lower() for b in PREDEFINED_BRANDS}
 _CATEGORY_WORDS = {kw for kws in _CATEGORY_KEYWORDS.values() for kw in kws}
 
 
+def _normalize_letter_digit_spacing(query: str) -> str:
+    # Typed-without-spaces model numbers ("17pro", "iphone17") tokenize as one
+    # non-digit blob and don't match either external API's fuzzy search, or
+    # a catalog product name's separately-spaced tokens. Split letter/digit
+    # runs apart before tokenizing anywhere query text needs to be compared.
+    normalized = re.sub(r"([a-zA-Z])(\d)", r"\1 \2", query)
+    normalized = re.sub(r"(\d)([a-zA-Z])", r"\1 \2", normalized)
+    return normalized
+
+
 def _query_keywords(query: str) -> List[str]:
     # Brand and category tokens are excluded — "iPhone 17" vs a catalog
     # top-hit of "iPhone 13" would otherwise "overlap" on the shared brand
     # alone and never register as a miss, even though the model is wrong.
-    tokens = re.findall(r"[a-z0-9]+", query.lower())
+    tokens = re.findall(r"[a-z0-9]+", _normalize_letter_digit_spacing(query).lower())
     return [
         t for t in tokens
         if len(t) > 1 and t not in _STOPWORDS and t not in _BRAND_WORDS and t not in _CATEGORY_WORDS
@@ -37,7 +47,7 @@ def _clean_product_query(query: str) -> str:
     chat sentence ("I want to buy iPhone 17 Pro Max") scores 0 matches on
     both even though "iPhone 17 Pro Max" alone finds it. Strip filler words,
     keep original casing/order for the rest."""
-    tokens = re.findall(r"[A-Za-z0-9]+", query)
+    tokens = re.findall(r"[A-Za-z0-9]+", _normalize_letter_digit_spacing(query))
     filtered = [t for t in tokens if t.lower() not in _STOPWORDS]
     return " ".join(filtered) if filtered else query
 
@@ -85,6 +95,26 @@ def _is_catalog_miss(query: str, products: List[Dict[str, Any]], filters: Dict[s
     return not any(kw in top_name for kw in remaining_keywords)
 
 
+def _reuse_miss(query: str, existing_products: List[Dict[str, Any]]) -> bool:
+    """Technical Agent normally reuses retrieved_products from state instead
+    of re-retrieving (so "compare these"/"which has a better camera" reasons
+    over the same set). But if the query names a specific product/model that
+    isn't anywhere in that stale set, reusing it silently answers about the
+    wrong product.
+
+    Only digit tokens count as a "specific model" signal here — same
+    digit-priority reasoning as _is_catalog_miss, checked against every
+    existing product's name, not just the top one. Generic technical
+    follow-ups ("compare these", "which has a better camera") have no
+    digits and must keep reusing state, or the compare/follow-up flow
+    Technical Agent is built around breaks."""
+    digit_keywords = [kw for kw in _query_keywords(query) if kw.isdigit()]
+    if not digit_keywords:
+        return False
+    names_blob = " ".join((p.get("product_name") or "").lower() for p in existing_products)
+    return not any(kw in names_blob for kw in digit_keywords)
+
+
 def build_retrieval_filters(state: AgentState) -> Dict[str, Any]:
     filters: Dict[str, Any] = {}
     if state.get("selected_category"):
@@ -119,7 +149,7 @@ def run_retrieval_agent(
     )
 
     existing_products = state.get("retrieved_products") or []
-    if reuse_existing_products and existing_products:
+    if reuse_existing_products and existing_products and not _reuse_miss(last_human, existing_products):
         products = existing_products
     else:
         filters = build_retrieval_filters(state)
