@@ -6,6 +6,7 @@ python-multipart
 sse-starlette
 python-dotenv
 requests
+tavily-python
 
 # LangChain
 langchain

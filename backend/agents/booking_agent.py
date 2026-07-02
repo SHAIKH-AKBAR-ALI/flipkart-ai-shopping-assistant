@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 from langchain_core.messages import AIMessage, HumanMessage
 
 from agents.state import AgentState
+from rag.price_lookup import lookup_inr_price
 
 _REQUIRED_FIELDS = ["name", "address", "phone", "payment_method"]
 
@@ -57,6 +58,19 @@ def _filter_by_mentioned_brand(products: list, text: str) -> list:
     if len(mentioned) == 1:
         return [p for p in products if (p.get("brand") or "").lower() == mentioned[0]]
     return products
+
+
+def _resolve_by_name(products: list, text: str) -> Optional[Dict[str, Any]]:
+    """Select a product when its full name appears verbatim in the user's
+    message. When several product names match (one being a substring of the
+    text alongside a longer, more specific one), the longest — i.e. most
+    specific — name wins. Returns None if nothing matches."""
+    tl = text.lower()
+    matches = [p for p in products if (p.get("product_name") or "").lower() in tl]
+    if not matches:
+        return None
+    matches.sort(key=lambda p: len(p.get("product_name") or ""), reverse=True)
+    return matches[0]
 
 
 def _resolve_candidate(candidates: list, text: str) -> Optional[Dict[str, Any]]:
@@ -122,6 +136,7 @@ def _create_order(selected_product: Dict[str, Any], transaction_id: str) -> Dict
         "order_id": str(uuid.uuid4()),
         "product_name": selected_product.get("product_name"),
         "price": selected_product.get("price"),
+        "price_source": selected_product.get("price_source", "catalog"),
         "transaction_id": transaction_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -130,8 +145,9 @@ def _create_order(selected_product: Dict[str, Any], transaction_id: str) -> Dict
 def _phrase_confirmation(llm, order: Dict[str, Any]) -> str:
     if llm is None:
         return (
-            f"Order confirmed! {order['product_name']} — Order ID {order['order_id']}, "
-            f"Price Rs.{order['price']}. Thank you for shopping with us."
+            f"Done — {order['product_name']} is officially yours. Order ID "
+            f"{order['order_id']}, Rs.{order['price']}. Nicely chosen; we'll take it "
+            f"from here."
         )
     try:
         from langchain_core.messages import HumanMessage as _HM
@@ -139,15 +155,23 @@ def _phrase_confirmation(llm, order: Dict[str, Any]) -> str:
 
         response = llm.invoke(
             [
-                _SM(content="Phrase a short, friendly order confirmation message using the given order details. Do not invent details."),
+                _SM(content=(
+                    "You're the Booking desk wrapping up a purchase. Write a short, "
+                    "warm order-confirmation message using ONLY the order details "
+                    "given — order id, product, price (Indian Rupees). One or two "
+                    "sentences, genuinely pleased for them, a light touch of humor is "
+                    "fine (think 'nicely done' not a stand-up routine). Do not invent "
+                    "any detail, discount, or delivery date that isn't in the data."
+                )),
                 _HM(content=str(order)),
             ]
         )
         return response.content
     except Exception:
         return (
-            f"Order confirmed! {order['product_name']} — Order ID {order['order_id']}, "
-            f"Price Rs.{order['price']}. Thank you for shopping with us."
+            f"Done — {order['product_name']} is officially yours. Order ID "
+            f"{order['order_id']}, Rs.{order['price']}. Nicely chosen; we'll take it "
+            f"from here."
         )
 
 
@@ -189,7 +213,13 @@ def make_booking_agent_node(llm=None):
                     new_state["_last_response"] = {"message": reply, "booking_state": None}
                     return new_state
 
-                candidates = _filter_by_mentioned_brand(retrieved_products, last_human)
+                # If the user already named a specific product (its full name
+                # appears in the message, e.g. "book Godrej 200 L Direct Cool
+                # ..."), select it directly — don't fall back to brand-only
+                # disambiguation, which would needlessly re-ask when several
+                # products share a brand.
+                named = _resolve_by_name(retrieved_products, last_human)
+                candidates = [named] if named else _filter_by_mentioned_brand(retrieved_products, last_human)
                 if len(candidates) == 1:
                     selected_product = candidates[0]
                     new_state["selected_product"] = selected_product
@@ -204,29 +234,55 @@ def make_booking_agent_node(llm=None):
                     return new_state
 
         # Live-data (web_source) products have no verified price (0.0) — they
-        # come from the external fallback API, not the catalog, and can't be
-        # ordered or paid for. Refuse clearly up front instead of letting the
-        # user fill in name/address/phone/payment and only then hit a cryptic
-        # "Invalid price 0.0" at the validation step. Only guard when starting
-        # a booking — never mid-payment (a product already in processing can't
-        # be a web product, since it would never have passed validation).
+        # come from the external fallback API, not the catalog. Rather than
+        # refuse outright, fetch an ESTIMATED INR price off the open web
+        # (Tavily) and, if found, stamp it onto the product and go straight into
+        # collecting details — the estimate disclaimer rides along on the first
+        # form prompt, and the payment page later shows the exact amount the
+        # user must approve, so no separate yes/no confirm turn is needed. If no
+        # reliable price is found, refuse. Only runs when starting a booking —
+        # never mid-payment (a product in processing can't be a web product, it
+        # would never have passed validation).
         if (
             selected_product
             and not _is_bookable(selected_product)
             and booking_state.get("step") not in ("processing_payment", "creating_order", "confirmed")
         ):
             name = selected_product.get("product_name", "That product")
-            reply = (
-                f"“{name}” is live web data without a verified price, so it "
-                "can’t be booked here. I can book any product from our catalog — "
-                "search within a budget and pick one of those to continue."
-            )
-            new_state["selected_product"] = None
-            new_state["booking_state"] = None
-            new_state["messages"] = messages + [AIMessage(content=reply)]
-            new_state["_agent_responded"] = True
-            new_state["_last_response"] = {"message": reply, "booking_state": None}
-            return new_state
+            est = lookup_inr_price(name, selected_product.get("brand", ""), llm)
+            if est and est.get("price"):
+                price = est["price"]
+                confidence = est.get("confidence", "low")
+                # Stamp the estimate onto the product so it becomes bookable, and
+                # record price_source for auditability on the order.
+                selected_product = dict(selected_product)
+                selected_product["price"] = price
+                selected_product["price_source"] = "web_estimate"
+                new_state["selected_product"] = selected_product
+                qualifier = "" if confidence == "high" else " (rough estimate)"
+                booking_state = {
+                    "step": "collecting_details",
+                    "details": {},
+                    "web_price_note": (
+                        f"Note: “{name}” isn't in our catalog — I'm using an "
+                        f"estimated web price of Rs.{price}{qualifier}, which isn't "
+                        f"Flipkart-verified and may differ from the final amount.\n\n"
+                    ),
+                }
+                # fall through into the collecting_details flow below
+
+            else:
+                reply = (
+                    f"“{name}” is live web data and I couldn't find a reliable price "
+                    "for it, so it can't be booked here. I can book any product from "
+                    "our catalog — search within a budget and pick one to continue."
+                )
+                new_state["selected_product"] = None
+                new_state["booking_state"] = None
+                new_state["messages"] = messages + [AIMessage(content=reply)]
+                new_state["_agent_responded"] = True
+                new_state["_last_response"] = {"message": reply, "booking_state": None}
+                return new_state
 
         booking_state = booking_state or {"step": "collecting_details", "details": {}}
         booking_state = dict(booking_state)
@@ -237,7 +293,10 @@ def make_booking_agent_node(llm=None):
             booking_state["details"].update(_extract_details(last_human))
             missing = _missing_fields(booking_state["details"])
             if missing:
+                # Show the web-estimate disclaimer once, on the first form prompt.
+                note = booking_state.pop("web_price_note", "")
                 reply = (
+                    note +
                     "To confirm your booking I still need: " + ", ".join(missing) +
                     ". Please provide them (e.g. \"name: Rahul Sharma, address: 221B MG Road Mumbai, "
                     "phone: 9876543210, payment: UPI\")."

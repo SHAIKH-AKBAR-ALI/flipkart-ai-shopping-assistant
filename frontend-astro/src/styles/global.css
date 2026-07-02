@@ -16,10 +16,26 @@
   --color-sage: #7c8a6e;
 }
 
+/* Dark mode re-themes the same tokens in place (Tailwind utilities reference
+   these as CSS vars), so component markup needs zero dark: variants. */
+:root.dark {
+  --color-cream: #1b1815;
+  --color-cream-dark: #141210;
+  --color-paper: #24201b;
+  --color-ink: #f0e9dc;
+  --color-ink-soft: #b3a695;
+  --color-border-soft: #3a332a;
+  --color-coral: #e08a5f;
+  --color-coral-dark: #f0a67d;
+  --color-coral-soft: #3d2b1f;
+  --color-sage: #9cae8a;
+}
+
 body {
   background-color: var(--color-cream);
   color: var(--color-ink);
   font-family: var(--font-body);
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
 ::selection {

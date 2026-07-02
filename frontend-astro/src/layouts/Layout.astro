@@ -12,7 +12,7 @@ const { title = 'Flipkart Assist' } = Astro.props;
 	<head>
 		<meta charset="utf-8" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 		<meta name="generator" content={Astro.generator} />
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -21,8 +21,39 @@ const { title = 'Flipkart Assist' } = Astro.props;
 			rel="stylesheet"
 		/>
 		<title>{title}</title>
+		<script is:inline>
+			(function () {
+				var stored = localStorage.getItem('flipkart_theme');
+				var dark = stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+				if (dark) document.documentElement.classList.add('dark');
+			})();
+		</script>
 	</head>
 	<body class="min-h-screen bg-cream text-ink font-body antialiased">
+		<button
+			id="theme-toggle"
+			type="button"
+			aria-label="Toggle dark mode"
+			class="fixed right-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full border border-border-soft bg-paper text-sm text-ink-soft shadow-sm transition-colors hover:border-coral hover:text-coral-dark sm:right-4 sm:top-4"
+		>
+			<span id="theme-toggle-icon">🌙</span>
+		</button>
 		<slot />
+		<script>
+			const btn = document.getElementById('theme-toggle');
+			const icon = document.getElementById('theme-toggle-icon');
+
+			function syncIcon() {
+				icon.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
+			}
+
+			btn.addEventListener('click', () => {
+				const isDark = document.documentElement.classList.toggle('dark');
+				localStorage.setItem('flipkart_theme', isDark ? 'dark' : 'light');
+				syncIcon();
+			});
+
+			syncIcon();
+		</script>
 	</body>
 </html>

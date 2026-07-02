@@ -1,0 +1,177 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Payment Verification — Flipkart Assist">
+	<div class="flex min-h-screen items-center justify-center px-4 py-10">
+		<div class="w-full max-w-md rounded-2xl border border-border-soft bg-paper p-8 shadow-sm">
+			<a id="back-link" href="/" class="mb-6 inline-block text-xs font-medium uppercase tracking-widest text-ink-soft hover:text-coral-dark">
+				← Back to chat
+			</a>
+
+			<div id="progress-bar" class="mb-6 flex items-center"></div>
+
+			<h1 class="font-display text-xl text-ink">Complete payment verification</h1>
+			<div class="mt-2 text-sm text-ink-soft">
+				<span id="payment-method">—</span> · <span id="payment-amount">—</span>
+			</div>
+
+			<div class="mt-6 rounded-xl border border-border-soft bg-cream px-5 py-6 text-center">
+				<p class="text-xs uppercase tracking-widest text-ink-soft">Solve to verify</p>
+				<p id="question" class="mt-2 font-display text-3xl text-ink">—</p>
+			</div>
+
+			<form id="challenge-form" class="mt-5 space-y-3">
+				<input
+					id="answer-input"
+					type="number"
+					inputmode="numeric"
+					required
+					class="w-full rounded-lg border border-border-soft bg-cream px-3 py-2 text-center text-lg focus:border-coral focus:outline-none"
+					placeholder="Your answer"
+				/>
+				<button
+					type="submit"
+					class="w-full rounded-lg bg-coral px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-coral-dark"
+				>
+					Submit
+				</button>
+			</form>
+
+			<p id="inline-error" class="mt-3 hidden text-center text-sm font-medium text-red-600">Incorrect, try again</p>
+			<p id="attempts-left" class="mt-2 text-center text-xs text-ink-soft"></p>
+
+			<div id="failed-panel" class="mt-5 hidden rounded-xl border border-red-200 bg-red-50 p-5 text-center">
+				<p class="font-display text-lg text-red-700">Payment failed</p>
+				<p class="mt-1 text-sm text-red-600">You've used all 3 attempts.</p>
+				<button
+					id="try-again-btn"
+					class="mt-4 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+				>
+					Try again
+				</button>
+			</div>
+		</div>
+	</div>
+
+	<div
+		id="success-toast"
+		class="pointer-events-none fixed left-1/2 top-8 -translate-x-1/2 rounded-lg bg-sage px-5 py-3 text-sm font-medium text-white opacity-0 shadow-lg transition-opacity duration-300"
+	>
+		Payment successful!
+	</div>
+
+	<script>
+		const MAX_ATTEMPTS = 3;
+		let attempts = 0;
+		let answer = 0;
+
+		let ctx = {};
+		try {
+			ctx = JSON.parse(sessionStorage.getItem('flipkart_payment_context') || '{}');
+		} catch {
+			ctx = {};
+		}
+
+		const categorySlug = ctx.categorySlug || null;
+		const backHref = categorySlug ? `/chat/${categorySlug}` : '/';
+		document.getElementById('back-link').setAttribute('href', backHref + '?payment=failed');
+
+		document.getElementById('payment-method').textContent = ctx.method || 'Payment method';
+		document.getElementById('payment-amount').textContent =
+			ctx.amount != null ? `Rs. ${Number(ctx.amount).toLocaleString('en-IN')}` : '—';
+
+		const progressLabels = ['Details', 'Validating', 'Payment', 'Order', 'Confirmed'];
+		const activeIndex = 2; // Payment step
+
+		function renderProgress() {
+			const bar = document.getElementById('progress-bar');
+			bar.innerHTML = progressLabels
+				.map((label, i) => {
+					const done = i < activeIndex;
+					const active = i === activeIndex;
+					const dotClass = done
+						? 'bg-coral text-white'
+						: active
+							? 'bg-coral-soft text-coral-dark border border-coral'
+							: 'bg-ink/10 text-ink-soft';
+					return `
+						<div class="flex flex-1 flex-col items-center gap-1">
+							<div class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${dotClass}">${i + 1}</div>
+							<span class="text-[11px] text-ink-soft">${label}</span>
+						</div>
+					`;
+				})
+				.join('<div class="mt-3 h-px flex-1 bg-border-soft"></div>');
+		}
+
+		function generateQuestion() {
+			const a = Math.floor(Math.random() * 20) + 1;
+			const b = Math.floor(Math.random() * 20) + 1;
+			const op = Math.random() < 0.5 ? '+' : '-';
+			let x = a;
+			let y = b;
+			if (op === '-' && a < b) {
+				x = b;
+				y = a;
+			}
+			answer = op === '+' ? x + y : x - y;
+			document.getElementById('question').textContent = `${x} ${op} ${y} = ?`;
+			document.getElementById('answer-input').value = '';
+		}
+
+		function updateAttemptsLeft() {
+			const left = MAX_ATTEMPTS - attempts;
+			document.getElementById('attempts-left').textContent =
+				attempts > 0 ? `${left} attempt${left === 1 ? '' : 's'} left` : '';
+		}
+
+		function showToastAndRedirect() {
+			const toast = document.getElementById('success-toast');
+			toast.textContent = 'Payment successful!';
+			toast.classList.remove('opacity-0');
+			document.getElementById('challenge-form').classList.add('hidden');
+			setTimeout(() => {
+				window.location.href = `${backHref}?payment=success`;
+			}, 1500);
+		}
+
+		function resetChallenge() {
+			attempts = 0;
+			document.getElementById('failed-panel').classList.add('hidden');
+			document.getElementById('challenge-form').classList.remove('hidden');
+			document.getElementById('inline-error').classList.add('hidden');
+			updateAttemptsLeft();
+			generateQuestion();
+		}
+
+		document.getElementById('challenge-form').addEventListener('submit', (e) => {
+			e.preventDefault();
+			const input = document.getElementById('answer-input');
+			const value = parseInt(input.value, 10);
+
+			if (value === answer) {
+				showToastAndRedirect();
+				return;
+			}
+
+			attempts += 1;
+			if (attempts >= MAX_ATTEMPTS) {
+				document.getElementById('challenge-form').classList.add('hidden');
+				document.getElementById('inline-error').classList.add('hidden');
+				document.getElementById('attempts-left').textContent = '';
+				document.getElementById('failed-panel').classList.remove('hidden');
+				return;
+			}
+
+			document.getElementById('inline-error').classList.remove('hidden');
+			updateAttemptsLeft();
+			generateQuestion();
+		});
+
+		document.getElementById('try-again-btn').addEventListener('click', resetChallenge);
+
+		renderProgress();
+		resetChallenge();
+	</script>
+</Layout>

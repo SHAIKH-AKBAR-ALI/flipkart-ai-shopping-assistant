@@ -185,7 +185,7 @@ async def chat(req: ChatRequest):
     store = app.state.session_store
     graph = app.state.graph
 
-    state = store.get_state(req.session_id)
+    state = await asyncio.to_thread(store.get_state, req.session_id)
     state["messages"] = state["messages"] + [HumanMessage(content=req.message)]
     state["_agent_responded"] = False
 
@@ -203,7 +203,7 @@ async def chat(req: ChatRequest):
         logger.exception("Graph invocation failed.")
         raise HTTPException(status_code=500, detail=f"Agent graph failed: {e}")
 
-    store.save_state(req.session_id, result)
+    await asyncio.to_thread(store.save_state, req.session_id, result)
 
     messages = result.get("messages", [])
     last_ai = messages[-1].content if messages else ""
@@ -250,5 +250,5 @@ def clear_session(session_id: str):
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.environ.get("PORT_V2", 8001))
+    port = int(os.environ.get("PORT", os.environ.get("PORT_V2", 8000)))
     uvicorn.run("app_v2:app", host="0.0.0.0", port=port, reload=True)

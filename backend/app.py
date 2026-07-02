@@ -4,10 +4,13 @@ import os
 import traceback
 from collections import Counter
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 
@@ -130,6 +133,48 @@ app.add_middleware(
 Instrumentator().instrument(app).expose(app)
 
 
+# ── Global Exception Handlers ──────────────────────────────────────────────────
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc: HTTPException):
+    """Formats standard HTTPExceptions into a uniform JSON response structure."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": exc.detail,
+            "code": f"HTTP_{exc.status_code}",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc: RequestValidationError):
+    """Formats request validation errors into a uniform 422 JSON response structure."""
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": exc.errors(),
+            "code": "VALIDATION_ERROR",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc: Exception):
+    """Catch-all handler to log internal server errors and return a safe message."""
+    logger.exception("Unhandled server error occurred.")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "An internal server error occurred.",
+            "code": "INTERNAL_SERVER_ERROR",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    )
+
+
 # ── Request/Response models ────────────────────────────────────────────────────
 
 class FiltersModel(BaseModel):
@@ -207,7 +252,9 @@ async def chat(req: ChatRequest, background_tasks: BackgroundTasks):
     category = _resolve_category(req.category)
     filters = req.filters.model_dump() if req.filters else None
 
-    response = agent.run(
+    # Offload the blocking CPU/network agent execution to a separate thread
+    response = await asyncio.to_thread(
+        agent.run,
         query=req.query,
         session_id=req.session_id,
         category=category,
@@ -232,7 +279,12 @@ async def analyze(req: AnalyzeRequest):
         raise HTTPException(status_code=503, detail="Service is initializing. Retry in ~60 seconds.")
     agent = app.state.agent
     category = _resolve_category(req.category)
-    result = agent.analyze_product(product_name=req.product_name, category=category or req.category)
+    # Offload the blocking CPU/network product analysis execution to a separate thread
+    result = await asyncio.to_thread(
+        agent.analyze_product,
+        product_name=req.product_name,
+        category=category or req.category
+    )
     return result
 
 

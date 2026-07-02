@@ -242,7 +242,7 @@ function bookingProgressHtml(bookingState) {
 // Exact text of the Supervisor's first-turn clarification (backend/agents/supervisor.py
 // clarify_msg) — matched verbatim so we can swap it for a budget quick-pick UI client-side.
 const _CLARIFY_TEXT =
-  "I want to make sure I get this right — are you asking about pricing/offers, specs/comparisons, or ready to book something?";
+  "I want to point you at the right person and not the wrong one — are we talking price and offers, specs and comparisons, or are you ready to actually book something?";
 
 function budgetRangesFor(categoryLabel) {
   const noun = categoryLabel.toLowerCase();
@@ -308,7 +308,7 @@ function bookingFormHtml(bookingState) {
       const cls = selected
         ? 'border-coral bg-coral-soft text-coral-dark'
         : 'border-border-soft bg-cream text-ink-soft';
-      return `<button type="button" data-payment-option data-value="${method}" class="payment-btn rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${cls}">${method}</button>`;
+      return `<button type="button" data-payment-option data-value="${method}" class="payment-btn rounded-lg border px-1.5 py-2 text-center text-xs font-medium leading-tight transition-colors sm:px-3 sm:text-sm ${cls}">${method}</button>`;
     })
     .join('');
 

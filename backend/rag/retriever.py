@@ -168,18 +168,22 @@ class HybridRetriever:
 
         results = []
         for match in matches:
-            meta = match["metadata"]
+            meta = match.get("metadata") or {}
+            # A doc without a product_id can't participate in RRF merge or
+            # the frontend's compare flow — skip it rather than 500 the turn.
+            if not meta.get("product_id"):
+                continue
             results.append(
                 {
                     "product_id": meta["product_id"],
-                    "product_name": meta["product_name"],
+                    "product_name": meta.get("product_name", ""),
                     "brand": meta.get("brand"),
-                    "category": meta["category"],
-                    "price": meta["price"],
-                    "rating": meta["rating"],
+                    "category": meta.get("category"),
+                    "price": meta.get("price", 0.0),
+                    "rating": meta.get("rating", 0.0),
                     "review_count": meta.get("review_count"),
-                    "content": match["content"],
-                    "dense_score": match["$similarity"],
+                    "content": match.get("content", ""),
+                    "dense_score": match.get("$similarity", 0.0),
                 }
             )
         return results

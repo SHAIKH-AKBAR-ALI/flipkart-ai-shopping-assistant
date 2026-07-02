@@ -89,13 +89,20 @@ Bug found + fixed during verification: `app_v2.py` never called `load_dotenv()`,
 
 Status: ⏳ Pending
 
-- [ ] Full end-to-end testing (chat → booking → confirmation)
-- [ ] Bug fixes
+- [x] Full end-to-end testing (chat → booking → confirmation)
+- [x] Bug fixes
 - [ ] Rename/rebrand
 - [ ] Deployment
 - [ ] Final README update
 
-Notes:
+Notes: Final pre-deployment sweep (2026-07-03): plural brand normalization
+("iphones" → apple alias), budget prepositions added to stopwords, port
+default unified to 8000 (env PORT respected), CLAUDE.md env-var section
+completed. Backend audit: defensive AstraDB metadata parsing in retriever,
+session-store calls moved off the event loop in /chat. Frontend audit:
+same-category refresh now persists the transcript (category switch still
+forks a fresh session). 10-step headless-Playwright smoke test: 10/10 pass,
+zero console errors.
 
 ---
 

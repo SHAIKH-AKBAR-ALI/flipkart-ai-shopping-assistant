@@ -12,6 +12,9 @@ _STOPWORDS = {
     "i", "want", "to", "buy", "the", "a", "an", "is", "of", "for", "in", "on",
     "with", "please", "show", "me", "find", "looking", "need", "get", "book",
     "order", "purchase", "about", "and", "or", "from",
+    # Budget-range prepositions — always attached to an amount the filters
+    # already consumed, never a product-name signal.
+    "above", "below", "under", "over", "between", "than", "within",
 }
 _BRAND_WORDS = {b.lower() for b in PREDEFINED_BRANDS}
 # Product-line words users type instead of the canonical brand — "iphone"
@@ -80,8 +83,14 @@ def _clean_product_query(query: str) -> str:
     has_brand = False
     for tok in tokens:
         lo = tok.lower()
+        singular = lo.rstrip("s")
         if lo in _BRAND_WORDS or lo in _BRAND_ALIASES:
             signal.append(tok)
+            has_brand = True
+        elif singular in _BRAND_WORDS or singular in _BRAND_ALIASES:
+            # "iphones"/"macbooks" — send the singular form the search APIs
+            # actually index.
+            signal.append(tok[: len(singular)])
             has_brand = True
         elif lo in _MODEL_QUALIFIERS:
             signal.append(tok)
@@ -174,6 +183,9 @@ def _query_brands(query: str) -> set:
     """Brands/product-lines named in the query, resolved to canonical brand
     (lowercase). "iphone" -> apple, "samsung" -> samsung."""
     tokens = set(re.findall(r"[a-z0-9]+", _normalize_letter_digit_spacing(query).lower()))
+    # Users pluralize product lines ("iphones", "macbooks") — the alias table
+    # holds singular forms, so match on the de-pluralized token too.
+    tokens |= {t.rstrip("s") for t in tokens}
     found = set()
     for b in _BRAND_WORDS:
         if b in tokens:

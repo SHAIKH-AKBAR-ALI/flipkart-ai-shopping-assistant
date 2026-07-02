@@ -186,8 +186,9 @@ def make_supervisor_node(llm):
         if intent == "clarify":
             clarify_msg = AIMessage(
                 content=(
-                    "I want to make sure I get this right — are you asking about "
-                    "pricing/offers, specs/comparisons, or ready to book something?"
+                    "I want to point you at the right person and not the wrong one — "
+                    "are we talking price and offers, specs and comparisons, or are "
+                    "you ready to actually book something?"
                 )
             )
             new_state["messages"] = messages + [clarify_msg]

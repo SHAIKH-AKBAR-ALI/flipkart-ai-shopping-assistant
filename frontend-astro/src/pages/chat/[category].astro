@@ -15,19 +15,19 @@ if (!category) {
 ---
 
 <Layout title={`${category.label} — Flipkart Assist`}>
-	<div class="mx-auto flex h-screen max-w-4xl flex-col px-4 py-6 sm:px-6">
-		<header class="mb-4 flex items-center justify-between border-b border-border-soft pb-4">
-			<div>
+	<div class="mx-auto flex h-screen max-h-[100dvh] min-h-0 max-w-4xl flex-col px-4 py-4 [height:100dvh] sm:px-6 sm:py-6">
+		<header class="mb-4 flex flex-col gap-3 border-b border-border-soft pb-4 sm:flex-row sm:items-center sm:justify-between">
+			<div class="pr-12 sm:pr-0">
 				<a href="/" class="text-xs font-medium uppercase tracking-widest text-coral hover:text-coral-dark">
 					← Flipkart Assist
 				</a>
-				<h1 class="font-display text-2xl text-ink">{category.label}</h1>
+				<h1 class="font-display text-xl text-ink sm:text-2xl">{category.label}</h1>
 			</div>
-			<div class="flex items-center gap-3">
-				<label class="text-xs text-ink-soft" for="category-switch">Switch</label>
+			<div class="flex items-center gap-2 sm:gap-3">
+				<label class="hidden text-xs text-ink-soft sm:inline" for="category-switch">Switch</label>
 				<select
 					id="category-switch"
-					class="rounded-lg border border-border-soft bg-paper px-2 py-1.5 text-sm text-ink focus:border-coral focus:outline-none"
+					class="min-w-0 flex-1 rounded-lg border border-border-soft bg-paper px-2 py-1.5 text-sm text-ink focus:border-coral focus:outline-none sm:flex-none"
 				>
 					{CATEGORIES.map((c) => (
 						<option value={c.slug} selected={c.slug === category.slug}>{c.label}</option>
@@ -35,7 +35,7 @@ if (!category) {
 				</select>
 				<button
 					id="new-conversation"
-					class="rounded-lg border border-border-soft bg-paper px-3 py-1.5 text-sm font-medium text-ink-soft transition-colors hover:border-coral hover:text-coral-dark"
+					class="shrink-0 whitespace-nowrap rounded-lg border border-border-soft bg-paper px-3 py-1.5 text-sm font-medium text-ink-soft transition-colors hover:border-coral hover:text-coral-dark"
 				>
 					New conversation
 				</button>
@@ -49,7 +49,7 @@ if (!category) {
 			</button>
 		</div>
 
-		<main id="chat-messages" class="flex-1 space-y-4 overflow-y-auto pb-4 pr-1"></main>
+		<main id="chat-messages" class="min-h-0 flex-1 space-y-4 overflow-y-auto pb-4 pr-1"></main>
 
 		<div id="typing-indicator" class="mb-2 hidden text-xs text-ink-soft">Assistant is typing…</div>
 
@@ -69,7 +69,7 @@ if (!category) {
 			</button>
 		</form>
 
-		<div id="compare-bar" class="pointer-events-none fixed inset-x-0 bottom-6 z-40 hidden justify-center px-4">
+		<div id="compare-bar" class="pointer-events-none fixed inset-x-0 bottom-24 z-40 hidden justify-center px-4 sm:bottom-6">
 			<button
 				id="compare-btn"
 				type="button"
@@ -109,10 +109,13 @@ if (!category) {
 		// it. Wiping the session here would drop the booking mid-flow (the
 		// payment glitch). Only reset on a genuinely new visit.
 		const returningFromPayment = /[?&]payment=(success|failed)/.test(window.location.search);
-		if (!returningFromPayment) {
-			// Every fresh load of a category page is a clean slate — don't carry
-			// over history/session from a previous visit to this (or any other)
-			// category.
+		// A refresh of the SAME category keeps the session and transcript
+		// (restored from sessionStorage). Only switching to a different
+		// category — or an explicit "New conversation" — starts fresh, so
+		// state never bleeds across categories.
+		const lastCategory = sessionStorage.getItem('flipkart_last_category');
+		const categoryChanged = lastCategory !== categorySlug;
+		if (!returningFromPayment && categoryChanged) {
 			const previousSessionId = sessionStorage.getItem('flipkart_session_id');
 			if (previousSessionId) {
 				clearHistory(previousSessionId);
@@ -120,6 +123,7 @@ if (!category) {
 			}
 			resetSessionId();
 		}
+		sessionStorage.setItem('flipkart_last_category', categorySlug);
 
 		initChatApp({
 			categoryLabel,
