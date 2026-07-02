@@ -14,6 +14,7 @@ letting a flaky upstream API crash the agent turn.
 
 import logging
 import os
+import uuid
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -71,6 +72,15 @@ def _to_float(value: Any, default: float = 0.0) -> float:
 
 def _join_specs(parts: List[str]) -> str:
     return " | ".join(p for p in parts if p)
+
+
+def _make_product_id(category: str, brand: str, name: str) -> str:
+    # Same deterministic scheme as rag/ingestion.py's catalog product_id —
+    # required for the frontend compare-checkbox flow, which keys selection
+    # state and its productIndex map by product_id. Without one, every
+    # fallback card rendered with the same empty id and "Compare" silently
+    # no-op'd (productIndex.get("") -> undefined, filtered out below 2).
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{category}:{brand}:{name}"))
 
 
 class MobileAPIFallback:
@@ -148,6 +158,7 @@ class MobileAPIFallback:
         image_url = f"data:image/jpeg;base64,{image_b64}" if image_b64 else ""
 
         return {
+            "product_id": _make_product_id("Mobile", str(brand), str(name)),
             "product_name": str(name),
             "brand": str(brand),
             "category": "Mobile",
@@ -258,6 +269,7 @@ class TechSpecsFallback:
         image_url = image_raw if isinstance(image_raw, str) and image_raw.startswith("http") else ""
 
         return {
+            "product_id": _make_product_id(category, str(brand), str(name)),
             "product_name": str(name),
             "brand": str(brand),
             "category": category,
