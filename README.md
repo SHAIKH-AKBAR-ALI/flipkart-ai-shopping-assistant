@@ -1,102 +1,131 @@
-# Flipkart AI Shopping Assistant 🛍️
+# Flipkart AI Shopping Assistant
 
-![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)
-![React](https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
-![LangChain](https://img.shields.io/badge/LangChain-1C3C3C?style=for-the-badge&logo=langchain)
-![Groq](https://img.shields.io/badge/Groq-F55036?style=for-the-badge&logo=groq&logoColor=white)
-![AstraDB](https://img.shields.io/badge/DataStax_AstraDB-315A5A?style=for-the-badge)
-![Vite](https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=FFD62E)
-![TailwindCSS](https://img.shields.io/badge/Tailwind_4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
-![LangGraph](https://img.shields.io/badge/LangGraph-232B2B?style=for-the-badge)
+A RAG-powered, multi-agent shopping assistant for Flipkart product catalogs — a LangGraph Supervisor routes every message to a Sales, Technical, or Booking agent, backed by a hybrid dense + BM25 retrieval pipeline over AstraDB.
 
-## Overview
-An intelligent AI-powered shopping assistant built with a production-grade RAG (Retrieval-Augmented Generation) architecture. Users can have natural conversations to get personalized product recommendations across 6 categories with context-aware responses.
+**Live demo:** [Frontend URL] | [Backend URL] <!-- fill in after deploy -->
 
-## ✨ Features
-- 🤖 **Multi-agent routing with LangGraph** — dedicated specialist agent per category
-- 🔍 **Hybrid search pipeline** combining AstraDB vector search + BM25 keyword search + cross-encoder reranking
-- 💬 **Context-aware conversations** with persistent session management (SQLAlchemy)
-- ⚡ **Ultra-fast LLM inference** via Groq (llama-3.3-70b)
-- 📊 **Built-in RAG evaluation pipeline** using Ragas
-- 🎨 **Modern React 19 UI** with Framer Motion animations and dark mode
-- 📦 **Structured JSON output** for clean product card rendering
+![Screenshot](docs/screenshot.png) <!-- add screenshot after deploy -->
 
-## 🏗️ Architecture
-The system employs a sophisticated Agentic RAG flow:
-1. **User Query**: The user asks a question via the React UI.
-2. **FastAPI**: Receives the request and initiates the LangGraph workflow.
-3. **LangGraph Router**: Analyzes the query intent and routes it to the appropriate domain expert (e.g., Laptop, Mobile).
-4. **Hybrid Retriever**: The chosen agent queries the knowledge base using a mix of AstraDB (semantic search) and BM25 (keyword matching), refined by a cross-encoder reranker for maximum relevance.
-5. **Category Specialist Agent**: Synthesizes the retrieved context and formulates a response tailored to the category's unique specifications.
-6. **Structured JSON**: The output is strictly formatted as JSON containing the answer text, product metadata, and suggested follow-ups.
-7. **React UI**: Parses the JSON to display interactive message bubbles and rich product cards.
+---
 
-## 🛠️ Tech Stack
+## What it does
 
-| Category | Technologies |
-| :--- | :--- |
-| **Frontend** | React 19, Vite, TailwindCSS 4, Framer Motion, React Router v7, Axios |
-| **Backend** | FastAPI, LangChain, LangGraph, Groq (llama-3.3-70b), OpenAI |
-| **Database** | DataStax AstraDB (vector), SQLite/PostgreSQL (sessions) |
-| **Search** | Rank-BM25, Sentence Transformers, Cross-encoder reranking |
-| **Evaluation** | Ragas |
-| **Deployment** | Railway (backend), Vercel (frontend) |
+- **6 product categories** — Laptops, Mobiles, TVs, Refrigerators, Smart Watches, Washing Machines — each with its own chat context (sessions never leak across categories).
+- **3 specialized agents**, routed per turn by a Supervisor:
+  - **Sales Agent** — pricing, EMI, offers, budget-driven recommendations
+  - **Technical Agent** — specs, comparisons ("compare these", "which has a better camera") over the products already retrieved, without re-querying
+  - **Booking Agent** — a deterministic state machine that disambiguates the product, collects name/address/phone/payment, and hands off to a mock payment page before confirming the order
+- **Hybrid RAG pipeline** — metadata filters (category / budget / rating) applied *before* retrieval, dense vector search (AstraDB) fused with BM25 via Reciprocal Rank Fusion, then reranked with a cross-encoder to a final top 4.
+- **Live-data fallback** — when the catalog can't answer, external product APIs (MobileAPI, TechSpecs) fill in, with a web price lookup via Tavily.
 
-## 📁 Project Structure
-```text
-flipkart-rag-v2/
-├── backend/
-│   ├── app.py                # FastAPI entry point
-│   ├── requirements.txt      # Python dependencies
-│   ├── data/                 # Raw datasets (CSVs)
-│   └── flipkart/             # Core AI package
-│       ├── agent.py          # LangGraph routing & agents
-│       ├── retriever.py      # Hybrid RAG search
-│       ├── session_store.py  # SQLAlchemy chat history
-│       ├── evaluator.py      # Ragas evaluation
-│       └── data_ingestion.py # Embedding generation
-└── frontend/
-    ├── package.json          # Node dependencies
-    ├── vite.config.js        # Build configuration
-    └── src/
-        ├── App.jsx           # Root layout & routing
-        ├── pages/            # LandingPage, ChatPage
-        ├── components/       # Reusable UI widgets
-        └── hooks/            # Custom React hooks
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | [Astro](https://astro.build) (static output, vanilla JS islands), Tailwind CSS v4 |
+| Backend | [FastAPI](https://fastapi.tiangolo.com) |
+| Orchestration | [LangGraph](https://langchain-ai.github.io/langgraph/) (Supervisor + 3 agent nodes) |
+| LLM | [Groq](https://groq.com) — `llama-3.3-70b-versatile` via `langchain-groq` |
+| Ingestion | [LlamaIndex](https://www.llamaindex.ai) document pipeline |
+| Vector DB | [DataStax AstraDB](https://www.datastax.com/products/datastax-astra) (queried directly via `astrapy`) |
+| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` (local CPU) |
+| Reranker | `cross-encoder/ms-marco-MiniLM-L-6-v2` (local CPU) |
+| Keyword search | `rank-bm25` |
+| Live product data | MobileAPI, TechSpecs (catalog fallback) |
+| Sessions | SQLite via SQLAlchemy |
+| Observability | LangSmith tracing (optional) |
+
+## Architecture
+
+### Multi-agent graph
+
+```
+START → Supervisor → (sales | technical | booking | clarify)
+             ↑              │
+             └── sub-agent ─┘   (Supervisor's second visit ends the turn)
 ```
 
-## ⚙️ Environment Variables
-Create a `.env` file in the `backend/` directory:
+The Supervisor classifies intent with the LLM (keyword-match fallback if the call fails), extracts category/budget/rating filters from the message, and carries them forward in session state. A booking flow already in progress owns the next turn outright — replies like "the third one" can't be re-classified out of context.
+
+### Retrieval pipeline
+
+```
+query
+  ↓  metadata filter (category / budget / rating) — applied BEFORE retrieval
+  ├─ Dense search (AstraDB, K=20)
+  └─ BM25 (pre-filtered in-memory corpus, K=20)
+  ↓  Reciprocal Rank Fusion (k=60)
+  ↓  Cross-encoder rerank → top 4
+```
+
+Filters are pushed down into both search paths — never applied post-hoc over an unfiltered result set — so a "laptops under ₹50,000" query is scored only against laptops under ₹50,000.
+
+## Local setup
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18+
+- A [DataStax AstraDB](https://astra.datastax.com) database and a [Groq](https://console.groq.com) API key
+
+### 1. Clone
+
+```bash
+git clone <repo-url>
+cd flipkart-rag-v2
+```
+
+### 2. Backend
+
+Create `backend/.env`:
+
 ```env
-GROQ_API_KEY=your_groq_api_key
-ASTRA_DB_API_ENDPOINT=your_astra_db_endpoint
-ASTRA_DB_APPLICATION_TOKEN=your_astra_db_token
-ASTRA_DB_KEYSPACE=your_keyspace
-ASTRA_DB_COLLECTION=your_collection
-OPENAI_API_KEY=your_openai_api_key
+GROQ_API_KEY=
+ASTRA_DB_API_ENDPOINT=
+ASTRA_DB_APPLICATION_TOKEN=
+ASTRA_DB_KEYSPACE=
+ASTRA_DB_COLLECTION=
+
+# External catalog-fallback APIs
+MOBILE_API_KEY=
+TECHSPECS_API_ID=
+TECHSPECS_API_KEY=
+
+# LangSmith tracing (optional)
+LANGCHAIN_TRACING_V2=
+LANGCHAIN_API_KEY=
+LANGCHAIN_PROJECT=
+
+# CORS (comma-separated; defaults to http://localhost:4321 if unset)
+ALLOWED_ORIGINS=
 ```
 
-## 🚀 Local Setup
+Install and run:
 
-### Backend
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate  # Or venv\Scripts\activate on Windows
 pip install -r requirements.txt
-uvicorn app:app --reload --port 8080
+uvicorn app_v2:app --reload
 ```
 
-### Frontend
+The API starts on `http://localhost:8000`; heavy initialization (embeddings, BM25 corpus, graph compilation) happens in the background — poll `/ready` until it returns `{"ready": true}`.
+
+### 3. Frontend
+
 ```bash
-cd frontend
+cd frontend-astro
 npm install
 npm run dev
 ```
 
-## 🌐 Live Demo
-- **Frontend**: https://flipkart-ai-shopping-assistant.vercel.app
-- **Backend API**: _[Deploy to Railway to get URL]_
+Opens on `http://localhost:4321`, pointed at `http://localhost:8000` by default (override with `PUBLIC_API_BASE_URL`).
 
-## 📄 License
+## Known limitations
+
+- **TV category fallback is weak** — the external catalog APIs cover mobiles well but TV lookups often return thin or no data, so TV answers lean almost entirely on the ingested CSV catalog.
+- **Budget filters reset on product switch** — a budget range that contradicts the previous one is treated as a fresh filter context (by design, to avoid impossible min > max ranges), so earlier constraints don't carry over.
+- **MobileAPI occasionally returns 0 results on noisy queries** — long or heavily qualified product names can miss; the assistant falls back to catalog data when that happens.
+
+## License
+
 MIT
