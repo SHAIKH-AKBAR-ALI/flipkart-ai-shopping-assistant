@@ -184,6 +184,24 @@ def _query_brands(query: str) -> set:
     return found
 
 
+def _has_product_signal(query: str, filters: Dict[str, Any]) -> bool:
+    """Does the query actually name a product to look up? A brand/product-line,
+    a model qualifier (pro/ultra/...), or a model-number digit that isn't a
+    budget/rating value. A bare budget query ("mobiles above 50k") has none —
+    there's nothing to search a name-based API for, so firing the fallback
+    just returns unrelated junk. Gate the external lookup on this."""
+    if _query_brands(query):
+        return True
+    filter_digits = _filter_digit_tokens(filters)
+    tokens = re.findall(r"[a-z0-9]+", _normalize_letter_digit_spacing(query).lower())
+    for t in tokens:
+        if t in _MODEL_QUALIFIERS:
+            return True
+        if t.isdigit() and t not in filter_digits and int(t) < 2000:
+            return True
+    return False
+
+
 def build_retrieval_filters(state: AgentState) -> Dict[str, Any]:
     filters: Dict[str, Any] = {}
     if state.get("selected_category"):
@@ -223,7 +241,11 @@ def run_retrieval_agent(
     else:
         filters = build_retrieval_filters(state)
         products = retriever.retrieve(last_human, filters=filters)
-        if _is_catalog_miss(last_human, products, filters):
+        # Only reach for the external name-search API when the catalog fell
+        # short AND the query actually names a product. A bare budget query
+        # ("mobiles above 50k") that misses the catalog has nothing to search
+        # for — firing the fallback there just returns unrelated phones.
+        if _is_catalog_miss(last_human, products, filters) and _has_product_signal(last_human, filters):
             category = state.get("selected_category")
             fallback_query = _clean_product_query(last_human)
             # Reuse the retriever's already-loaded cross-encoder for reranking

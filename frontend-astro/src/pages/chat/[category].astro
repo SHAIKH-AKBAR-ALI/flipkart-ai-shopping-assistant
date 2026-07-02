@@ -68,18 +68,62 @@ if (!category) {
 				Send
 			</button>
 		</form>
+
+		<div id="compare-bar" class="pointer-events-none fixed inset-x-0 bottom-6 z-40 hidden justify-center px-4">
+			<button
+				id="compare-btn"
+				type="button"
+				disabled
+				class="pointer-events-auto rounded-full bg-coral px-6 py-3 text-sm font-medium text-white shadow-lg transition-colors hover:bg-coral-dark disabled:cursor-not-allowed disabled:opacity-50"
+			>
+				Compare (0)
+			</button>
+		</div>
 	</div>
+
+	<div id="product-detail-overlay" class="fixed inset-0 z-40 hidden bg-ink/30"></div>
+	<aside
+		id="product-detail-panel"
+		class="fixed right-0 top-0 z-50 h-full w-full max-w-sm translate-x-full transform bg-paper shadow-2xl transition-transform duration-[250ms] ease-out sm:max-w-md"
+	>
+		<div class="flex h-full flex-col overflow-y-auto p-6">
+			<button id="detail-close-btn" aria-label="Close panel" class="self-end text-lg text-ink-soft hover:text-coral-dark">✕</button>
+			<div id="detail-content" class="mt-2 flex-1"></div>
+		</div>
+	</aside>
 
 	<script define:vars={{ categoryLabel: category.label, categorySlug: category.slug }}>
 		window.__CHAT_CONTEXT__ = { categoryLabel, categorySlug };
 	</script>
 	<script>
 		import { initChatApp } from '../../lib/chat-app.js';
+		import { resetSessionId } from '../../lib/session.js';
+		import { clearHistory } from '../../lib/history.js';
+		import { deleteSession } from '../../lib/api.js';
 
 		const { categoryLabel, categorySlug } = window.__CHAT_CONTEXT__;
 
+		// Returning from the /payment page (?payment=success|failed) is NOT a
+		// fresh visit — the in-progress booking lives in the current session
+		// and the redirect handler needs to send payment_confirmed/failed to
+		// it. Wiping the session here would drop the booking mid-flow (the
+		// payment glitch). Only reset on a genuinely new visit.
+		const returningFromPayment = /[?&]payment=(success|failed)/.test(window.location.search);
+		if (!returningFromPayment) {
+			// Every fresh load of a category page is a clean slate — don't carry
+			// over history/session from a previous visit to this (or any other)
+			// category.
+			const previousSessionId = sessionStorage.getItem('flipkart_session_id');
+			if (previousSessionId) {
+				clearHistory(previousSessionId);
+				deleteSession(previousSessionId).catch(() => {});
+			}
+			resetSessionId();
+		}
+
 		initChatApp({
 			categoryLabel,
+			categorySlug,
 			seedMessage: `I'm looking for ${categoryLabel.toLowerCase()}.`,
 		});
 

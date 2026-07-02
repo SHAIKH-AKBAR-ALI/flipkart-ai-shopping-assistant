@@ -14,6 +14,7 @@ letting a flaky upstream API crash the agent turn.
 
 import logging
 import os
+import time
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -23,6 +24,38 @@ logger = logging.getLogger(__name__)
 
 _TIMEOUT_SECONDS = 5
 _TOP_N = 4
+_MAX_RETRIES = 2  # total attempts on a transient 429 / 5xx
+_RETRY_BACKOFF_SECONDS = 1.0
+
+
+def _get_with_retry(url: str, **kwargs) -> requests.Response:
+    """GET that retries once on a transient rate-limit (429) or server error
+    (5xx) with a short backoff. These free-tier APIs 429 under bursty use;
+    a single silent retry recovers the common case instead of the agent
+    getting an empty result set and telling the user nothing was found."""
+    last_exc: Optional[Exception] = None
+    for attempt in range(_MAX_RETRIES):
+        try:
+            response = requests.get(url, **kwargs)
+            if response.status_code == 429 or response.status_code >= 500:
+                if attempt < _MAX_RETRIES - 1:
+                    logger.warning(
+                        "api_fallback: %s on %s (attempt %d/%d), retrying...",
+                        response.status_code, url, attempt + 1, _MAX_RETRIES,
+                    )
+                    time.sleep(_RETRY_BACKOFF_SECONDS * (attempt + 1))
+                    continue
+            response.raise_for_status()
+            return response
+        except requests.exceptions.RequestException as exc:
+            last_exc = exc
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(_RETRY_BACKOFF_SECONDS * (attempt + 1))
+                continue
+            raise
+    if last_exc:
+        raise last_exc
+    raise RuntimeError("unreachable")
 
 _MOBILE_API_URL = "https://api.mobileapi.dev/devices/search"
 _TECHSPECS_API_URL = "https://api.techspecs.io/v5/products/search"
@@ -103,12 +136,11 @@ class MobileAPIFallback:
             return []
 
         try:
-            response = requests.get(
+            response = _get_with_retry(
                 _MOBILE_API_URL,
                 params={"name": query, "key": api_key},
                 timeout=_TIMEOUT_SECONDS,
             )
-            response.raise_for_status()
             payload = response.json()
         except Exception:
             logger.exception("api_fallback: MobileAPI request failed for query=%r", query)
@@ -207,13 +239,12 @@ class TechSpecsFallback:
             params["category"] = techspecs_category
 
         try:
-            response = requests.get(
+            response = _get_with_retry(
                 _TECHSPECS_API_URL,
                 headers={"x-api-id": api_id, "x-api-key": api_key},
                 params=params,
                 timeout=_TIMEOUT_SECONDS,
             )
-            response.raise_for_status()
             payload = response.json()
         except Exception:
             logger.exception(
