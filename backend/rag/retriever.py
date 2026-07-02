@@ -100,6 +100,12 @@ class HybridRetriever:
             self._reranker = CrossEncoder(RERANKER_MODEL)
         return self._reranker
 
+    def get_reranker(self) -> CrossEncoder:
+        """Public accessor so the API-fallback path can reuse this one loaded
+        cross-encoder instead of instantiating its own (which re-downloads
+        and re-loads the model from the HF hub on every fallback call)."""
+        return self._get_reranker()
+
     @staticmethod
     def _matches_filters(
         item: Dict[str, Any],

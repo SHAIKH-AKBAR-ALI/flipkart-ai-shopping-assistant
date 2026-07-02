@@ -27,30 +27,39 @@ _TOP_N = 4
 _MOBILE_API_URL = "https://api.mobileapi.dev/devices/search"
 _TECHSPECS_API_URL = "https://api.techspecs.io/v5/products/search"
 
+# TechSpecs categories are: Smartphones, Tablets, Smartwatches, Laptops,
+# Desktops — there is NO TV category. Only map what actually exists; a TV
+# query is sent with no category filter (search across everything and let
+# the reranker surface the closest matches) rather than being forced into
+# "Smartphones", which returned phones for a TV query.
 _TECHSPECS_CATEGORY_MAP = {
     "Laptop": "Laptops",
-    "TV": "Smartphones",  # TechSpecs has no TV category; search unfiltered by omitting instead.
     "Smartwatch": "Smartwatches",
     "Smart Watch": "Smartwatches",
 }
 
 
-def _rerank_documents(query: str, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Rerank web_source results with the same cross-encoder used by HybridRetriever.
+def _rerank_documents(
+    query: str, results: List[Dict[str, Any]], reranker: Optional[Any] = None
+) -> List[Dict[str, Any]]:
+    """Rerank web_source results with the cross-encoder.
 
-    Imports CrossEncoder + RERANKER_MODEL lazily (function scope) so this module
-    has no import-time dependency on rag/retriever.py — retriever.py is heavier
-    (AstraDB client, embeddings, BM25 corpus) and we don't want api_fallback.py
-    to pull any of that in just to reuse one model.
+    Prefers a `reranker` instance passed in by the caller (the one already
+    loaded by HybridRetriever) — that avoids re-downloading and re-loading
+    the model from the HF hub on every fallback call. Falls back to lazily
+    constructing its own only when called standalone with no instance. The
+    CrossEncoder import stays function-scoped so this module keeps no
+    import-time dependency on the heavier rag/retriever.py.
     """
     if not results:
         return []
     try:
-        from sentence_transformers import CrossEncoder
+        if reranker is None:
+            from sentence_transformers import CrossEncoder
 
-        from rag.config import RERANKER_MODEL
+            from rag.config import RERANKER_MODEL
 
-        reranker = CrossEncoder(RERANKER_MODEL)
+            reranker = CrossEncoder(RERANKER_MODEL)
         pairs = [(query, item.get("content", "")) for item in results]
         scores = reranker.predict(pairs)
         for item, score in zip(results, scores):
@@ -87,7 +96,7 @@ class MobileAPIFallback:
     """Wraps mobileapi.dev — mobiles only."""
 
     @staticmethod
-    def search(query: str) -> List[Dict[str, Any]]:
+    def search(query: str, reranker: Optional[Any] = None) -> List[Dict[str, Any]]:
         api_key = os.getenv("MOBILE_API_KEY")
         if not api_key:
             logger.error("api_fallback: MOBILE_API_KEY not set, skipping MobileAPI fallback.")
@@ -109,7 +118,7 @@ class MobileAPIFallback:
             raw_items = MobileAPIFallback._extract_items(payload)
             parsed = [MobileAPIFallback._parse_item(item) for item in raw_items]
             parsed = [p for p in parsed if p is not None]
-            return _rerank_documents(query, parsed)
+            return _rerank_documents(query, parsed, reranker)
         except Exception:
             logger.exception("api_fallback: MobileAPI response parsing failed for query=%r", query)
             return []
@@ -180,7 +189,7 @@ class TechSpecsFallback:
     """
 
     @staticmethod
-    def search(query: str, category: str) -> List[Dict[str, Any]]:
+    def search(query: str, category: str, reranker: Optional[Any] = None) -> List[Dict[str, Any]]:
         api_id = os.getenv("TECHSPECS_API_ID")
         api_key = os.getenv("TECHSPECS_API_KEY")
         if not api_id or not api_key:
@@ -220,7 +229,7 @@ class TechSpecsFallback:
                 TechSpecsFallback._parse_item(item, category) for item in raw_items
             ]
             parsed = [p for p in parsed if p is not None]
-            return _rerank_documents(query, parsed)
+            return _rerank_documents(query, parsed, reranker)
         except Exception:
             logger.exception(
                 "api_fallback: TechSpecs response parsing failed for query=%r", query

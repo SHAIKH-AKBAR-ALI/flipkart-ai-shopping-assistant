@@ -19,7 +19,7 @@ _BRAND_WORDS = {b.lower() for b in PREDEFINED_BRANDS}
 # ("iphone above 50k") can be matched against a stale result set's brands
 # even though the word "iphone" is never itself in PREDEFINED_BRANDS.
 _BRAND_ALIASES = {
-    "iphone": "apple", "iphone": "apple", "macbook": "apple", "ipad": "apple",
+    "iphone": "apple", "macbook": "apple", "ipad": "apple",
     "galaxy": "samsung",
     "redmi": "xiaomi", "poco": "xiaomi",
     "pixel": "google",
@@ -54,12 +54,45 @@ def _query_keywords(query: str) -> List[str]:
     ]
 
 
+# Words that qualify a model within a product line ("iPhone 17 PRO MAX",
+# "Galaxy S23 ULTRA", "ThinkPad X1 CARBON"). Kept in the fallback query.
+_MODEL_QUALIFIERS = {
+    "pro", "max", "plus", "ultra", "mini", "air", "se", "lite", "note",
+    "edge", "fold", "flip", "neo", "ace", "prime", "series", "gt", "turbo",
+    "active", "fe", "carbon", "gen",
+}
+
+
 def _clean_product_query(query: str) -> str:
     """MobileAPI/TechSpecs are keyword/fuzzy search, not semantic — a raw
-    chat sentence ("I want to buy iPhone 17 Pro Max") scores 0 matches on
-    both even though "iPhone 17 Pro Max" alone finds it. Strip filler words,
-    keep original casing/order for the rest."""
+    chat sentence ("tell me about the iPhone camera") drowns the one word
+    that matters ("iphone") in filler and scores 0 matches.
+
+    When the query names a brand/product-line, build the search string from
+    only the product-signal tokens: the brand/alias, model qualifiers, and
+    small digits (model generation / storage — not budget amounts). This
+    turns "tell me about iphone camera" into "iphone" and "iphone 17 pro max"
+    into itself. When no brand is named, fall back to a filler-word strip so
+    generic queries still send something."""
     tokens = re.findall(r"[A-Za-z0-9]+", _normalize_letter_digit_spacing(query))
+
+    signal: List[str] = []
+    has_brand = False
+    for tok in tokens:
+        lo = tok.lower()
+        if lo in _BRAND_WORDS or lo in _BRAND_ALIASES:
+            signal.append(tok)
+            has_brand = True
+        elif lo in _MODEL_QUALIFIERS:
+            signal.append(tok)
+        elif lo.isdigit() and int(lo) < 2000:
+            # Small numbers are model gen / storage (17, 256). Larger ones
+            # are budget amounts (20000, 50000) — noise for a name search.
+            signal.append(tok)
+
+    if has_brand and signal:
+        return " ".join(signal)
+
     filtered = [t for t in tokens if t.lower() not in _STOPWORDS]
     return " ".join(filtered) if filtered else query
 
@@ -193,10 +226,13 @@ def run_retrieval_agent(
         if _is_catalog_miss(last_human, products, filters):
             category = state.get("selected_category")
             fallback_query = _clean_product_query(last_human)
+            # Reuse the retriever's already-loaded cross-encoder for reranking
+            # web results — avoids re-loading the model from HF on every call.
+            reranker = retriever.get_reranker() if hasattr(retriever, "get_reranker") else None
             if category == "Mobile":
-                products = MobileAPIFallback.search(fallback_query)
+                products = MobileAPIFallback.search(fallback_query, reranker=reranker)
             elif category in ("Laptop", "TV", "Smartwatch", "Smart Watch"):
-                products = TechSpecsFallback.search(fallback_query, category)
+                products = TechSpecsFallback.search(fallback_query, category, reranker=reranker)
             # Refrigerator/Washing Machine: no fallback source, keep catalog
             # results as-is (possibly empty or a single item).
     context = format_products_for_prompt(products)
