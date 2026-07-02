@@ -15,6 +15,15 @@ function formatPrice(value) {
   return `Rs. ${Number(value).toLocaleString('en-IN')}`;
 }
 
+// Sales/Technical bubbles double as the retrieval source indicator — Booking
+// Agent and Supervisor don't retrieve products, so they never get a suffix.
+function agentSourceSuffix(agentUsed, products) {
+  if (agentUsed !== 'Sales Agent' && agentUsed !== 'Technical Agent') return '';
+  if (!products || !products.length) return '';
+  const isLive = products.some((p) => p.web_source);
+  return isLive ? ' · \u{1F310} Live' : ' · \u{1F5C4}\u{FE0F} DB';
+}
+
 function agentBadgeClasses(agent) {
   switch (agent) {
     case 'Sales Agent':
@@ -487,7 +496,7 @@ export function initChatApp({ categoryLabel, categorySlug, seedMessage }) {
         }
 
         const badge = msg.agent_used
-          ? `<span class="mb-2 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide ${agentBadgeClasses(msg.agent_used)}">${escapeHtml(msg.agent_used)}</span>`
+          ? `<span class="mb-2 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide ${agentBadgeClasses(msg.agent_used)}">${escapeHtml(msg.agent_used)}${agentSourceSuffix(msg.agent_used, msg.retrieved_products)}</span>`
           : '';
         const products =
           msg.retrieved_products && msg.retrieved_products.length

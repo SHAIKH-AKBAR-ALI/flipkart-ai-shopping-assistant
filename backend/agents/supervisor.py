@@ -21,9 +21,20 @@ _SALES_KEYWORDS = ["price", "cost", "emi", "offer", "discount", "deal", "availab
 _TECHNICAL_KEYWORDS = ["spec", "specs", "specification", "compare", "comparison", "vs", "feature", "camera", "battery", "pros", "cons", "processor", "ram"]
 _BOOKING_KEYWORDS = ["buy", "book", "purchase", "confirm", "order", "checkout", "take it", "i'll take"]
 
-_BUDGET_MAX_RE = re.compile(r"(?:under|below|less than|within|upto|up to)\s*(?:rs\.?|inr|₹)?\s*([\d,]+)", re.IGNORECASE)
-_BUDGET_MIN_RE = re.compile(r"(?:above|over|more than)\s*(?:rs\.?|inr|₹)?\s*([\d,]+)", re.IGNORECASE)
+_BUDGET_MAX_RE = re.compile(r"(?:under|below|less than|within|upto|up to)\s*(?:rs\.?|inr|₹)?\s*([\d,]+)\s*(k)?", re.IGNORECASE)
+_BUDGET_MIN_RE = re.compile(r"(?:above|over|more than)\s*(?:rs\.?|inr|₹)?\s*([\d,]+)\s*(k)?", re.IGNORECASE)
+_BUDGET_RANGE_RE = re.compile(
+    r"(?:rs\.?|inr|₹)?\s*([\d,]+)\s*(k)?\s*(?:to|-|–|and)\s*(?:rs\.?|inr|₹)?\s*([\d,]+)\s*(k)?",
+    re.IGNORECASE,
+)
 _RATING_RE = re.compile(r"(?:rating|rated)\s*(?:above|over|at least|>=?)?\s*(\d+(?:\.\d+)?)", re.IGNORECASE)
+
+
+def _parse_amount(num_str: str, k_suffix: Optional[str]) -> float:
+    value = float(num_str.replace(",", ""))
+    if k_suffix:
+        value *= 1000
+    return value
 
 _SYSTEM_PROMPT = (
     "You are an intent classifier for a shopping assistant. Given the latest user "
@@ -77,19 +88,27 @@ def _llm_classify(llm, message: str, state: AgentState) -> Optional[str]:
 def _extract_category(message: str) -> Optional[str]:
     text = message.lower()
     for category, keywords in _CATEGORY_KEYWORDS.items():
-        if any(kw in text for kw in keywords):
+        # Word-boundary match, not substring — "phone" as a bare substring
+        # matches inside "iphone", "headphone", "microphone", etc.
+        if any(re.search(r"\b" + re.escape(kw) + r"\b", text) for kw in keywords):
             return category
     return None
 
 
 def _extract_filters(message: str) -> dict:
     filters = {}
-    max_match = _BUDGET_MAX_RE.search(message)
-    if max_match:
-        filters["budget_max"] = float(max_match.group(1).replace(",", ""))
-    min_match = _BUDGET_MIN_RE.search(message)
-    if min_match:
-        filters["budget_min"] = float(min_match.group(1).replace(",", ""))
+    range_match = _BUDGET_RANGE_RE.search(message)
+    if range_match:
+        low = _parse_amount(range_match.group(1), range_match.group(2))
+        high = _parse_amount(range_match.group(3), range_match.group(4))
+        filters["budget_min"], filters["budget_max"] = min(low, high), max(low, high)
+    else:
+        max_match = _BUDGET_MAX_RE.search(message)
+        if max_match:
+            filters["budget_max"] = _parse_amount(max_match.group(1), max_match.group(2))
+        min_match = _BUDGET_MIN_RE.search(message)
+        if min_match:
+            filters["budget_min"] = _parse_amount(min_match.group(1), min_match.group(2))
     rating_match = _RATING_RE.search(message)
     if rating_match:
         filters["min_rating"] = float(rating_match.group(1))
@@ -97,14 +116,13 @@ def _extract_filters(message: str) -> dict:
 
 
 def _maybe_select_product(state: AgentState, message: str) -> Optional[dict]:
-    """Heuristic: if the user is moving to booking and hasn't picked a product yet,
-    but there are retrieved products from a prior turn, select the first one.
-    A real implementation would parse product name/ordinal references from the
-    message; this is a simple fallback, flagged as a scope decision."""
+    """Auto-select only when there's a single retrieved product — no ambiguity.
+    When multiple products are in state, leave selected_product unset so the
+    Booking Agent's disambiguation step asks the user which one they mean."""
     if state.get("selected_product"):
         return state["selected_product"]
     products = state.get("retrieved_products") or []
-    if products:
+    if len(products) == 1:
         return products[0]
     return None
 
@@ -120,11 +138,23 @@ def make_supervisor_node(llm):
             (m.content for m in reversed(messages) if isinstance(m, HumanMessage)), ""
         )
 
-        intent = _llm_classify(llm, last_human, state)
-        used_fallback = False
-        if intent is None:
-            intent = _keyword_classify(last_human)
-            used_fallback = True
+        # A booking flow in progress (mid-disambiguation or mid-details-collection)
+        # owns the next turn outright — a free-text reply like "the third one" or
+        # "name: X" can't be reliably re-classified by intent alone out of context.
+        booking_state = state.get("booking_state") or {}
+        booking_in_progress = booking_state.get("step") in (
+            "selecting_product", "collecting_details", "processing_payment",
+        )
+
+        if booking_in_progress:
+            intent = "booking"
+            used_fallback = False
+        else:
+            intent = _llm_classify(llm, last_human, state)
+            used_fallback = False
+            if intent is None:
+                intent = _keyword_classify(last_human)
+                used_fallback = True
 
         new_state = dict(state)
         new_state["intent"] = intent
@@ -144,6 +174,14 @@ def make_supervisor_node(llm):
             selected = _maybe_select_product(new_state, last_human)
             if selected:
                 new_state["selected_product"] = selected
+            elif not booking_in_progress and not new_state.get("retrieved_products"):
+                # "I want to buy X" as an opening message, before any product
+                # has ever been retrieved: nothing to select or disambiguate
+                # yet. Route to Sales first so it finds candidates — the next
+                # confirm turn will reclassify as booking with a product (or
+                # a disambiguation prompt) already in state.
+                intent = "sales"
+                new_state["intent"] = "sales"
 
         if intent == "clarify":
             clarify_msg = AIMessage(
