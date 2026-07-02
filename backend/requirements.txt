@@ -2,22 +2,14 @@
 # Core
 fastapi
 uvicorn
-python-multipart
-sse-starlette
 python-dotenv
 requests
 tavily-python
 
-# LangChain
-langchain
+# LangChain / LangGraph (V2: Groq LLM + LangGraph orchestration only)
 langchain-core
-langchain-community
-langchain-openai
-langchain-astradb
 langchain-groq
-
-# OpenAI
-openai
+langgraph
 
 # Vector DB
 astrapy
@@ -25,30 +17,19 @@ astrapy
 # BM25
 rank-bm25
 
-# Reranker
+# Reranker / embeddings
 torch==2.2.1+cpu
 sentence-transformers==2.6.1
 
-# Search tool
-duckduckgo-search
-
-# Evaluation
-ragas
-
 # Session storage
 sqlalchemy
-
-# Monitoring
-prometheus-client
-prometheus-fastapi-instrumentator
 
 # Utils
 pandas
 numpy<2
 pydantic
-tqdm
 
-# LlamaIndex (Phase 3)
+# LlamaIndex (ingestion pipeline + embeddings wrapper)
 llama-index-core
 llama-index-vector-stores-astra-db
 llama-index-embeddings-huggingface

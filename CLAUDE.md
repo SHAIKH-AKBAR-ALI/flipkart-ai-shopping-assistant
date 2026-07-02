@@ -9,9 +9,9 @@ assistant covering 6 product categories (Laptops, Mobiles, TVs,
 Refrigerators, Smart Watches, Washing Machines). A LangGraph Supervisor
 routes each turn to a Sales, Technical, or Booking agent; retrieval is a
 hybrid dense+BM25 pipeline over AstraDB reranked with a cross-encoder.
-The frontend is a standalone Astro app that talks to the V2 FastAPI
-backend over `/chat`. V1 (`backend/flipkart/`, `frontend/`) is a separate,
-untouched prior implementation kept only for reference.
+The frontend is a standalone Astro app that talks to the FastAPI
+backend over `/chat`. (An earlier V1 implementation was removed once V2
+became production-ready; V2 is the only implementation in the repo.)
 
 ## Tech stack
 
@@ -34,9 +34,7 @@ untouched prior implementation kept only for reference.
 
 ```
 backend/
-├── flipkart/            # V1 — DO NOT MODIFY
-├── app.py                # V1 FastAPI entrypoint (imports flipkart/ only)
-├── app_v2.py              # V2 FastAPI entrypoint — this is what's live
+├── app_v2.py              # FastAPI entrypoint — this is what's live
 ├── rag/                    # Hybrid retrieval package
 │   ├── config.py            # search-size constants (K values, top-N, cache size)
 │   ├── models.py             # RAGProduct pydantic schema (aspirational —
@@ -62,8 +60,7 @@ backend/
 │   │                                  # except optionally phrasing the final
 │   │                                  # confirmation message)
 │   ├── graph.py                       # build_graph() — wires the StateGraph
-│   └── session_store.py                # SessionStoreV2 (SQLite, separate DB file
-│                                         # from V1's session_store.py)
+│   └── session_store.py                # SessionStoreV2 (SQLite)
 └── data/                    # shared CSVs, sessions_v2.db
 ```
 
@@ -222,19 +219,14 @@ TECHSPECS_API_KEY=
 LANGCHAIN_TRACING_V2=
 LANGCHAIN_API_KEY=
 LANGCHAIN_PROJECT=
+
+# CORS (comma-separated; defaults to http://localhost:4321 if unset)
+ALLOWED_ORIGINS=
 ```
 
 (`OPENAI_API_KEY` also exists in `.env` from earlier experimentation but
 V2's live path — Groq LLM + local sentence-transformers embeddings — does
 not require it.)
-
-## Do NOT touch
-
-- `backend/flipkart/` — V1 backend, untouched parallel implementation
-- `frontend/` — V1 frontend (React + Vite), untouched parallel implementation
-
-These are kept for reference only; V2 is a ground-up rebuild, not an
-in-place edit.
 
 ## Decisions worth knowing
 
