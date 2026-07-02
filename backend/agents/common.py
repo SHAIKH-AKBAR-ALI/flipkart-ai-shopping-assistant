@@ -14,6 +14,18 @@ _STOPWORDS = {
     "order", "purchase", "about", "and", "or", "from",
 }
 _BRAND_WORDS = {b.lower() for b in PREDEFINED_BRANDS}
+# Product-line words users type instead of the canonical brand — "iphone"
+# means Apple, "galaxy" means Samsung, etc. Needed so a brand-only query
+# ("iphone above 50k") can be matched against a stale result set's brands
+# even though the word "iphone" is never itself in PREDEFINED_BRANDS.
+_BRAND_ALIASES = {
+    "iphone": "apple", "iphone": "apple", "macbook": "apple", "ipad": "apple",
+    "galaxy": "samsung",
+    "redmi": "xiaomi", "poco": "xiaomi",
+    "pixel": "google",
+    "thinkpad": "lenovo", "ideapad": "lenovo",
+    "nothing": "nothing",
+}
 # Category words ("mobiles", "laptop"...) are already enforced by the
 # retrieval filter — like brand words, they're never a distinguishing
 # signal in a top-hit's product name, so they'd otherwise cause a false
@@ -102,17 +114,41 @@ def _reuse_miss(query: str, existing_products: List[Dict[str, Any]]) -> bool:
     isn't anywhere in that stale set, reusing it silently answers about the
     wrong product.
 
-    Only digit tokens count as a "specific model" signal here — same
-    digit-priority reasoning as _is_catalog_miss, checked against every
-    existing product's name, not just the top one. Generic technical
-    follow-ups ("compare these", "which has a better camera") have no
-    digits and must keep reusing state, or the compare/follow-up flow
-    Technical Agent is built around breaks."""
-    digit_keywords = [kw for kw in _query_keywords(query) if kw.isdigit()]
-    if not digit_keywords:
-        return False
+    Two "specific product" signals count as a miss when absent from the
+    stale set: (a) a model number ("iphone 17" but state has only 13/15),
+    same digit-priority reasoning as _is_catalog_miss; (b) a brand/product-
+    line the state doesn't contain ("iphone above 50k" but state has only
+    Samsung/Nothing). Generic follow-ups ("compare these", "which has a
+    better camera") have neither and must keep reusing state, or the
+    compare/follow-up flow Technical Agent is built around breaks."""
     names_blob = " ".join((p.get("product_name") or "").lower() for p in existing_products)
-    return not any(kw in names_blob for kw in digit_keywords)
+
+    digit_keywords = [kw for kw in _query_keywords(query) if kw.isdigit()]
+    if digit_keywords and not any(kw in names_blob for kw in digit_keywords):
+        return True
+
+    query_brands = _query_brands(query)
+    if query_brands:
+        existing_brands = {(p.get("brand") or "").lower() for p in existing_products}
+        brand_blob = names_blob + " " + " ".join(existing_brands)
+        if not any(b in brand_blob for b in query_brands):
+            return True
+
+    return False
+
+
+def _query_brands(query: str) -> set:
+    """Brands/product-lines named in the query, resolved to canonical brand
+    (lowercase). "iphone" -> apple, "samsung" -> samsung."""
+    tokens = set(re.findall(r"[a-z0-9]+", _normalize_letter_digit_spacing(query).lower()))
+    found = set()
+    for b in _BRAND_WORDS:
+        if b in tokens:
+            found.add(b)
+    for alias, canon in _BRAND_ALIASES.items():
+        if alias in tokens:
+            found.add(canon)
+    return found
 
 
 def build_retrieval_filters(state: AgentState) -> Dict[str, Any]:

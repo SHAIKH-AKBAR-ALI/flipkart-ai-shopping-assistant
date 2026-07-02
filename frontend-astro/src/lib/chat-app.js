@@ -166,12 +166,13 @@ function recommendationBannerHtml(products) {
         ${_STAR_SVG} We recommend <span class="font-semibold">${escapeHtml(winner.product_name)}</span> —
         highest rated at ${winner.rating != null ? Number(winner.rating).toFixed(1) : '—'}, priced at ${formatPrice(winner.price)}
       </p>
-      <div class="mt-3 flex gap-2">
+      <p class="mt-3 text-sm font-medium text-ink">Want to book one of these, or explore more options?</p>
+      <div class="mt-2 flex gap-2">
         <button type="button" data-recommend-book data-product-name="${escapeHtml(winner.product_name)}" class="rounded-lg bg-coral px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-coral-dark">
           Book recommended
         </button>
-        <button type="button" data-recommend-other class="rounded-lg border border-coral px-4 py-2 text-sm font-medium text-coral-dark transition-colors hover:bg-coral-soft">
-          Book a different one
+        <button type="button" data-explore-more class="rounded-lg border border-coral px-4 py-2 text-sm font-medium text-coral-dark transition-colors hover:bg-coral-soft">
+          Explore more
         </button>
       </div>
     </div>
@@ -498,17 +499,20 @@ export function initChatApp({ categoryLabel, categorySlug, seedMessage }) {
         const badge = msg.agent_used
           ? `<span class="mb-2 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide ${agentBadgeClasses(msg.agent_used)}">${escapeHtml(msg.agent_used)}${agentSourceSuffix(msg.agent_used, msg.retrieved_products)}</span>`
           : '';
+        // On a comparison message, show only the picked products as cards —
+        // not the whole retrieved set the comparison was drawn from.
+        const isCompareMsg = msg.compare_products && msg.compare_products.length >= 2;
+        const cardSource = isCompareMsg ? msg.compare_products : msg.retrieved_products;
         const products =
-          msg.retrieved_products && msg.retrieved_products.length
-            ? `<div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">${msg.retrieved_products
+          cardSource && cardSource.length
+            ? `<div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">${cardSource
                 .map((p) => productCardHtml(p, compareSelection.includes(p.product_id)))
                 .join('')}</div>`
             : '';
         const booking = msg.booking_state ? `<div class="mt-3">${bookingProgressHtml(msg.booking_state)}</div>` : '';
-        const compareHtml =
-          msg.compare_products && msg.compare_products.length >= 2
-            ? compareTableHtml(msg.compare_products) + recommendationBannerHtml(msg.compare_products)
-            : '';
+        const compareHtml = isCompareMsg
+          ? compareTableHtml(msg.compare_products) + recommendationBannerHtml(msg.compare_products)
+          : '';
         const bubbleWidth = compareHtml ? 'max-w-[95%]' : 'max-w-[85%]';
 
         return `
@@ -558,11 +562,11 @@ export function initChatApp({ categoryLabel, categorySlug, seedMessage }) {
     els.messages.querySelectorAll('[data-recommend-book]').forEach((btn) => {
       btn.addEventListener('click', () => sendMessage(`I want to book ${btn.dataset.productName}`));
     });
-    els.messages.querySelectorAll('[data-recommend-other]').forEach((btn) => {
+    els.messages.querySelectorAll('[data-explore-more]').forEach((btn) => {
       btn.addEventListener('click', () => {
         compareSelection = [];
         updateCompareBar();
-        render();
+        sendMessage('show me more options');
       });
     });
 
