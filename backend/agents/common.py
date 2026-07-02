@@ -3,6 +3,7 @@ from typing import Any, Dict, List
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from agents.state import AgentState
+from rag.api_fallback import MobileAPIFallback, TechSpecsFallback
 
 
 def build_retrieval_filters(state: AgentState) -> Dict[str, Any]:
@@ -31,14 +32,27 @@ def run_retrieval_agent(
     retriever,
     llm,
     system_prompt: str,
+    reuse_existing_products: bool = False,
 ) -> AgentState:
     messages = state.get("messages", [])
     last_human = next(
         (m.content for m in reversed(messages) if isinstance(m, HumanMessage)), ""
     )
 
-    filters = build_retrieval_filters(state)
-    products = retriever.retrieve(last_human, filters=filters)
+    existing_products = state.get("retrieved_products") or []
+    if reuse_existing_products and existing_products:
+        products = existing_products
+    else:
+        filters = build_retrieval_filters(state)
+        products = retriever.retrieve(last_human, filters=filters)
+        if len(products) < 2:
+            category = state.get("selected_category")
+            if category == "Mobile":
+                products = MobileAPIFallback.search(last_human)
+            elif category in ("Laptop", "TV", "Smartwatch", "Smart Watch"):
+                products = TechSpecsFallback.search(last_human, category)
+            # Refrigerator/Washing Machine: no fallback source, keep catalog
+            # results as-is (possibly empty or a single item).
     context = format_products_for_prompt(products)
 
     llm_response = llm.invoke(
@@ -51,10 +65,11 @@ def run_retrieval_agent(
 
     new_state = dict(state)
     new_state["retrieved_products"] = products
-    # Auto-select the top-ranked result as "the product being discussed" if the
-    # user hasn't explicitly picked one yet — needed so a follow-up like "how's
-    # the camera on this one?" has something for selected_product to refer to.
-    if not new_state.get("selected_product") and products:
+    # Auto-select only when there's a single result — no ambiguity. When
+    # multiple products come back, leave selected_product unset so a later
+    # booking request triggers disambiguation instead of silently picking
+    # the top-ranked one.
+    if not new_state.get("selected_product") and len(products) == 1:
         new_state["selected_product"] = products[0]
     new_state["messages"] = messages + [AIMessage(content=reply_text)]
     new_state["_agent_responded"] = True

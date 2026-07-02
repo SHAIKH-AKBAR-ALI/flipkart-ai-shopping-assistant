@@ -5,6 +5,7 @@ uvicorn
 python-multipart
 sse-starlette
 python-dotenv
+requests
 
 # LangChain
 langchain
@@ -45,3 +46,8 @@ pandas
 numpy<2
 pydantic
 tqdm
+
+# LlamaIndex (Phase 3)
+llama-index-core
+llama-index-vector-stores-astra-db
+llama-index-embeddings-huggingface
