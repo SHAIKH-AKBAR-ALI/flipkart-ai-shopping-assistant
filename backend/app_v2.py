@@ -98,10 +98,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Flipkart RAG API v2 (multi-agent)", lifespan=lifespan)
 
+# ALLOWED_ORIGINS: comma-separated env allowlist; local Astro dev server default.
+_allowed_origins = [
+    o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()
+] or ["http://localhost:4321"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_allowed_origins,
+    # Credentials only with an explicit allowlist — never with a wildcard.
+    allow_credentials="*" not in _allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

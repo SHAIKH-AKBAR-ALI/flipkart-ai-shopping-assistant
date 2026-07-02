@@ -115,6 +115,26 @@ def _extract_filters(message: str) -> dict:
     return filters
 
 
+def _merge_filters(existing: dict, extracted: dict) -> dict:
+    """Merge newly extracted filters into existing ones — unless the new budget
+    contradicts the old range (e.g. "20k-35k" then "above 50000"). A contradiction
+    means the user changed their mind, so the new filters replace the old ones
+    entirely rather than accumulating into an impossible min>max range."""
+    new_min = extracted.get("budget_min")
+    new_max = extracted.get("budget_max")
+    conflict = (
+        (new_min is not None and existing.get("budget_max") is not None
+         and new_min > existing["budget_max"])
+        or (new_max is not None and existing.get("budget_min") is not None
+            and new_max < existing["budget_min"])
+    )
+    if conflict:
+        return dict(extracted)
+    merged = dict(existing)
+    merged.update(extracted)
+    return merged
+
+
 def _maybe_select_product(state: AgentState, message: str) -> Optional[dict]:
     """Auto-select only when there's a single retrieved product — no ambiguity.
     When multiple products are in state, leave selected_product unset so the
@@ -166,9 +186,9 @@ def make_supervisor_node(llm):
 
         extracted_filters = _extract_filters(last_human)
         if extracted_filters:
-            merged_filters = dict(state.get("filters") or {})
-            merged_filters.update(extracted_filters)
-            new_state["filters"] = merged_filters
+            new_state["filters"] = _merge_filters(
+                state.get("filters") or {}, extracted_filters
+            )
 
         if intent == "booking":
             selected = _maybe_select_product(new_state, last_human)
