@@ -1,0 +1,70 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+      - name: Health check
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          ASTRA_DB_API_ENDPOINT: ${{ secrets.ASTRA_DB_API_ENDPOINT }}
+          ASTRA_DB_APPLICATION_TOKEN: ${{ secrets.ASTRA_DB_APPLICATION_TOKEN }}
+          ASTRA_DB_KEYSPACE: ${{ secrets.ASTRA_DB_KEYSPACE }}
+          ASTRA_DB_COLLECTION: ${{ secrets.ASTRA_DB_COLLECTION }}
+          MOBILE_API_KEY: ${{ secrets.MOBILE_API_KEY }}
+          TECHSPECS_API_ID: ${{ secrets.TECHSPECS_API_ID }}
+          TECHSPECS_API_KEY: ${{ secrets.TECHSPECS_API_KEY }}
+          LANGCHAIN_TRACING_V2: "false"
+          ALLOWED_ORIGINS: "http://localhost:4321"
+        run: |
+          cd backend
+          uvicorn app_v2:app --host 0.0.0.0 --port 8000 &
+          sleep 15
+          curl -f http://localhost:8000/health
+          curl -f http://localhost:8000/ready
+          kill %1
+
+  deploy-backend:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Push backend to HF Spaces
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git config --global user.email "ci@github.com"
+          git config --global user.name "GitHub Actions"
+          git clone https://SHAIKH-AKBAR-ALI:$HF_TOKEN@huggingface.co/spaces/SHAIKH-AKBAR-ALI/flipkart-rag-backend hf_space
+          cp -r backend/. hf_space/
+          cd hf_space
+          git add -A
+          git diff --staged --quiet || git commit -m "Deploy ${{ github.sha }}"
+          git push
+
+  deploy-frontend:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy frontend to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          npm install -g vercel
+          cd frontend-astro
+          vercel --prod --yes --token $VERCEL_TOKEN
