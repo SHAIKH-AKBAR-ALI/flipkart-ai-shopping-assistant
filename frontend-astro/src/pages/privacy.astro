@@ -1,0 +1,64 @@
+---
+import InfoLayout from '../layouts/InfoLayout.astro';
+---
+
+<InfoLayout
+  title="Privacy policy — Flipkart Assist"
+  eyebrow="Privacy policy"
+  heading="What we keep, where it goes, and how to clear it."
+  intro="Flipkart Assist is a demo project, so this policy is short and honest rather than long and vague."
+>
+  <h2>What we collect</h2>
+  <ul>
+    <li><strong>Your chat messages</strong> — everything you type into the assistant.</li>
+    <li>
+      <strong>Booking details you provide</strong> — if you walk through the mock booking
+      flow, the name, address, and phone number you enter are held in your session.
+      They can be entirely made up; nothing checks them against reality.
+    </li>
+    <li>
+      <strong>A session ID</strong> — a random identifier kept in your browser's
+      sessionStorage so a page refresh can restore your conversation.
+    </li>
+  </ul>
+  <p>
+    We do not use analytics, advertising trackers, or cookies. There are no accounts and
+    no sign-in.
+  </p>
+
+  <h2>Where your data goes</h2>
+  <ul>
+    <li>
+      <strong>Groq</strong> — your messages are sent to Groq's API to generate the
+      assistant's replies, subject to Groq's own data policies.
+    </li>
+    <li>
+      <strong>Our backend</strong> — conversation state is stored in a server-side
+      session database so the agents can remember context between turns.
+    </li>
+    <li>
+      <strong>External product APIs</strong> — when the catalog can't answer, product
+      names from your query may be sent to third-party catalog APIs (MobileAPI,
+      TechSpecs) and a web search API (Tavily) to fetch live specs and prices.
+    </li>
+  </ul>
+
+  <h2>What we never collect</h2>
+  <p>
+    Payment is a mock flow — a simple arithmetic challenge stands in for a payment
+    gateway. <strong>No card number, UPI ID, or any payment credential is ever asked
+    for, transmitted, or stored.</strong>
+  </p>
+
+  <h2>Clearing your data</h2>
+  <p>
+    Click <strong>New conversation</strong> in any chat, or switch categories, and your
+    session is discarded and a fresh one starts. Closing the browser tab clears the
+    session ID and cached transcript from your browser.
+  </p>
+
+  <h2>Questions</h2>
+  <p>
+    Ask anything about this policy via the <a href="/contact">contact page</a>.
+  </p>
+</InfoLayout>

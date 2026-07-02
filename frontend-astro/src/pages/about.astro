@@ -1,0 +1,43 @@
+---
+import InfoLayout from '../layouts/InfoLayout.astro';
+---
+
+<InfoLayout
+  title="About us — Flipkart Assist"
+  eyebrow="About us"
+  heading="A shopping assistant that talks like a person and thinks like three."
+  intro="Flipkart Assist is a demo of what product search feels like when you can just ask — no filters to fiddle with, no twenty open tabs."
+>
+  <h2>What it is</h2>
+  <p>
+    Under the hood, every message you send is routed by a supervisor to one of three
+    specialist agents: a <strong>Sales agent</strong> for pricing, EMI, and offers, a
+    <strong>Technical agent</strong> for specs and side-by-side comparisons, and a
+    <strong>Booking agent</strong> that walks you through a (mock) order. They share one
+    conversation, so you never have to repeat yourself.
+  </p>
+  <p>
+    Answers come from a real retrieval pipeline — hybrid dense + keyword search over a
+    product catalog of laptops, mobiles, TVs, refrigerators, smart watches, and washing
+    machines, reranked so the four most relevant products surface first.
+  </p>
+
+  <h2>Why it exists</h2>
+  <p>
+    This is a portfolio project exploring multi-agent orchestration and
+    retrieval-augmented generation: LangGraph for agent routing, FastAPI on the backend,
+    AstraDB for vector search, Groq for fast LLM inference, and Astro on the frontend.
+    The catalog is a snapshot of public Flipkart listings used for demonstration.
+  </p>
+  <p>
+    <strong>Flipkart Assist is not affiliated with, endorsed by, or connected to
+    Flipkart.</strong> Nothing here places real orders or moves real money.
+  </p>
+
+  <h2>Try it</h2>
+  <p>
+    Pick a category on the <a href="/">home page</a> and ask anything you'd ask a
+    knowledgeable friend — "best phone camera under 30k", "compare these two", "book the
+    second one".
+  </p>
+</InfoLayout>

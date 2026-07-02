@@ -1,0 +1,39 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Something went wrong — Flipkart Assist">
+  <main class="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-6 py-16">
+    <p class="mb-4 font-body text-sm font-medium uppercase tracking-widest text-coral">
+      500 — Server error
+    </p>
+    <h1 class="font-display text-4xl leading-tight text-ink sm:text-5xl">
+      Something broke on our end.
+    </h1>
+    <p class="mt-5 max-w-xl text-lg leading-relaxed text-ink-soft">
+      Not you — us. The server hit an error while handling your request. Your
+      conversation is safe in your session; reloading usually picks up right where you
+      left off.
+    </p>
+
+    <div class="mt-8 flex flex-wrap gap-4">
+      <button
+        type="button"
+        onclick="window.location.reload()"
+        class="rounded-full bg-coral px-5 py-2.5 text-sm font-medium text-paper transition-colors hover:bg-coral-dark"
+      >
+        Reload the page
+      </button>
+      <a
+        href="/"
+        class="rounded-full border border-border-soft bg-paper px-5 py-2.5 text-sm font-medium text-ink-soft transition-colors hover:border-coral hover:text-coral-dark"
+      >
+        Back to the home page
+      </a>
+    </div>
+
+    <p class="mt-10 text-sm text-ink-soft">
+      Still stuck after a reload? <a href="/contact" class="text-coral underline underline-offset-3 hover:text-coral-dark">Tell us what happened</a>.
+    </p>
+  </main>
+</Layout>

@@ -1,0 +1,23 @@
+---
+const links = [
+  { href: '/about', label: 'About us' },
+  { href: '/#faq', label: 'FAQ' },
+  { href: '/contact', label: 'Contact us' },
+  { href: '/privacy', label: 'Privacy policy' },
+  { href: '/terms', label: 'Terms & conditions' },
+];
+---
+
+<footer class="mt-20 border-t border-border-soft pt-8 pb-4 text-sm text-ink-soft">
+  <nav aria-label="Footer" class="mb-4 flex flex-wrap gap-x-6 gap-y-2">
+    {links.map((l) => (
+      <a href={l.href} class="transition-colors hover:text-coral-dark">{l.label}</a>
+    ))}
+  </nav>
+  <p>
+    Multi-agent assistant · Sales, Technical &amp; Booking agents collaborate on every reply.
+  </p>
+  <p class="mt-2 text-xs">
+    A portfolio demo project. Not affiliated with Flipkart. No real orders, no real payments.
+  </p>
+</footer>

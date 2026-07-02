@@ -1,0 +1,42 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const categories = [
+  { slug: 'laptops', label: 'Laptops' },
+  { slug: 'mobiles', label: 'Mobiles' },
+  { slug: 'tvs', label: 'TVs' },
+  { slug: 'refrigerators', label: 'Refrigerators' },
+  { slug: 'smart-watches', label: 'Smart Watches' },
+  { slug: 'washing-machines', label: 'Washing Machines' },
+];
+---
+
+<Layout title="Page not found — Flipkart Assist">
+  <main class="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-6 py-16">
+    <p class="mb-4 font-body text-sm font-medium uppercase tracking-widest text-coral">
+      404 — Page not found
+    </p>
+    <h1 class="font-display text-4xl leading-tight text-ink sm:text-5xl">
+      This aisle doesn't exist.
+    </h1>
+    <p class="mt-5 max-w-xl text-lg leading-relaxed text-ink-soft">
+      The page you're after was moved, renamed, or never stocked in the first place.
+      The categories below are all real, though.
+    </p>
+
+    <nav aria-label="Product categories" class="mt-8 flex flex-wrap gap-3">
+      {categories.map((c) => (
+        <a
+          href={`/chat/${c.slug}`}
+          class="rounded-full border border-border-soft bg-paper px-4 py-2 text-sm text-ink-soft transition-colors hover:border-coral hover:text-coral-dark"
+        >
+          {c.label}
+        </a>
+      ))}
+    </nav>
+
+    <a href="/" class="mt-10 inline-block text-sm font-medium text-coral transition-colors hover:text-coral-dark">
+      ← Back to the home page
+    </a>
+  </main>
+</Layout>
