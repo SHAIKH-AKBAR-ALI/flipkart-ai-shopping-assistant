@@ -1,8 +1,8 @@
 ---
 title: Flipkart RAG Backend
 emoji: 🛒
-colorFrom: orange
-colorTo: yellow
+colorFrom: yellow
+colorTo: red
 sdk: docker
 pinned: false
 license: mit
