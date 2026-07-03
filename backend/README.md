@@ -5,6 +5,7 @@ colorFrom: orange
 colorTo: yellow
 sdk: docker
 pinned: false
+license: mit
 ---
 
 # Flipkart RAG Backend

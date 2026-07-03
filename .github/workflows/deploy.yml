@@ -47,7 +47,7 @@ jobs:
         run: |
           git config --global user.email "ci@github.com"
           git config --global user.name "GitHub Actions"
-          git clone https://SHAIKH-AKBAR-ALI:$HF_TOKEN@huggingface.co/spaces/SHAIKH-AKBAR-ALI/flipkart-rag-backend hf_space
+          git clone https://Akbarali1:$HF_TOKEN@huggingface.co/spaces/Akbarali1/flipkart-rag-backend hf_space
           cp -r backend/. hf_space/
           cd hf_space
           git add -A

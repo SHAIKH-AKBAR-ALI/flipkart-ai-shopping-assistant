@@ -2,9 +2,9 @@
 
 ## Architecture
 
-- **Backend** → Hugging Face Spaces (Docker), `SHAIKH-AKBAR-ALI/flipkart-rag-backend`,
+- **Backend** → Hugging Face Spaces (Docker), `Akbarali1/flipkart-rag-backend`,
   serves FastAPI on port 7860 at
-  `https://shaikh-akbar-ali-flipkart-rag-backend.hf.space`
+  `https://akbarali1-flipkart-rag-backend.hf.space`
 - **Frontend** → Vercel project `flipkart-ai-shopping-assistant`
   (`https://flipkart-ai-shopping-assistant.vercel.app`), built from
   `frontend-astro/`
@@ -43,15 +43,12 @@ Go to GitHub → Settings → Secrets and variables → Actions and add:
 
 ## Hugging Face Space setup (one-time)
 
-The CI pipeline pushes `backend/` into the Space's git repo. The Space must
-exist first:
+The Space exists at <https://huggingface.co/spaces/Akbarali1/flipkart-rag-backend>
+(Docker SDK, public). The CI pipeline pushes `backend/` into its git repo.
 
-1. Log in at huggingface.co, go to <https://huggingface.co/new-space>
-2. Owner: `SHAIKH-AKBAR-ALI`, Space name: `flipkart-rag-backend`
-3. SDK: **Docker** (blank template), visibility: **Public**
-4. In the Space's Settings → Variables and secrets, add the same backend
-   env vars as above (`GROQ_API_KEY`, `ASTRA_DB_*`, etc.) — the Space reads
-   them at runtime; GitHub secrets are only used by CI's health check.
+Remaining one-time step: in the Space's Settings → Variables and secrets, add
+the same backend env vars as above (`GROQ_API_KEY`, `ASTRA_DB_*`, etc.) — the
+Space reads them at runtime; GitHub secrets are only used by CI's health check.
 
 `backend/README.md` carries the required Space frontmatter (`sdk: docker`),
 and `backend/Dockerfile` serves on port 7860 (Spaces default).
