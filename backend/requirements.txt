@@ -17,9 +17,11 @@ astrapy
 # BM25
 rank-bm25
 
-# Reranker / embeddings
+# Reranker / embeddings (pinned together — stops pip backtracking in Docker build)
 torch==2.2.1+cpu
 sentence-transformers==2.6.1
+transformers==4.36.2
+huggingface-hub==0.20.3
 
 # Session storage
 sqlalchemy
