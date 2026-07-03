@@ -20,6 +20,8 @@ from astrapy import DataAPIClient
 from astrapy.constants import VectorMetric
 from dotenv import load_dotenv
 
+from env_utils import clean_env
+
 load_dotenv()
 
 VECTOR_DIMENSION = 384
@@ -27,10 +29,10 @@ SIMILARITY_METRIC = VectorMetric.COSINE
 
 
 def main() -> None:
-    endpoint = os.environ.get("ASTRA_DB_API_ENDPOINT")
-    token = os.environ.get("ASTRA_DB_APPLICATION_TOKEN")
-    keyspace = os.environ.get("ASTRA_DB_KEYSPACE", "default_keyspace")
-    collection_name = os.environ.get("ASTRA_DB_COLLECTION")
+    endpoint = clean_env("ASTRA_DB_API_ENDPOINT")
+    token = clean_env("ASTRA_DB_APPLICATION_TOKEN")
+    keyspace = clean_env("ASTRA_DB_KEYSPACE", "default_keyspace")
+    collection_name = clean_env("ASTRA_DB_COLLECTION")
 
     missing = [
         name

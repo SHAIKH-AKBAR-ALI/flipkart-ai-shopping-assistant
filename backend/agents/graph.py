@@ -20,7 +20,7 @@ def build_graph(retriever: HybridRetriever = None, llm=None):
     if llm is None:
         llm = ChatGroq(
             model="llama-3.3-70b-versatile",
-            api_key=os.environ["GROQ_API_KEY"],
+            api_key=os.environ["GROQ_API_KEY"].strip(),
             temperature=0.1,
         )
     if retriever is None:

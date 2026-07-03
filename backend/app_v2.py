@@ -15,6 +15,10 @@ from pydantic import BaseModel
 
 load_dotenv()
 
+from env_utils import clean_env, sanitize_env  # noqa: E402
+
+sanitize_env()  # HF Spaces secrets can carry trailing newlines
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -100,7 +104,7 @@ app = FastAPI(title="Flipkart RAG API v2 (multi-agent)", lifespan=lifespan)
 
 # ALLOWED_ORIGINS: comma-separated env allowlist; local Astro dev server default.
 _allowed_origins = [
-    o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()
+    o.strip() for o in clean_env("ALLOWED_ORIGINS", "").split(",") if o.strip()
 ] or ["http://localhost:4321"]
 
 app.add_middleware(

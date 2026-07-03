@@ -18,6 +18,8 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional
 
+from env_utils import clean_env
+
 import requests
 
 logger = logging.getLogger(__name__)
@@ -130,7 +132,7 @@ class MobileAPIFallback:
 
     @staticmethod
     def search(query: str, reranker: Optional[Any] = None) -> List[Dict[str, Any]]:
-        api_key = os.getenv("MOBILE_API_KEY")
+        api_key = clean_env("MOBILE_API_KEY")
         if not api_key:
             logger.error("api_fallback: MOBILE_API_KEY not set, skipping MobileAPI fallback.")
             return []
@@ -222,8 +224,8 @@ class TechSpecsFallback:
 
     @staticmethod
     def search(query: str, category: str, reranker: Optional[Any] = None) -> List[Dict[str, Any]]:
-        api_id = os.getenv("TECHSPECS_API_ID")
-        api_key = os.getenv("TECHSPECS_API_KEY")
+        api_id = clean_env("TECHSPECS_API_ID")
+        api_key = clean_env("TECHSPECS_API_KEY")
         if not api_id or not api_key:
             logger.error(
                 "api_fallback: TECHSPECS_API_ID/TECHSPECS_API_KEY not set, "

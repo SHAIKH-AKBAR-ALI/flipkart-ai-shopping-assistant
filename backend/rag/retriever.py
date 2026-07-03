@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 from rank_bm25 import BM25Okapi
 from sentence_transformers import CrossEncoder
 
+from env_utils import clean_env
 from rag.config import (
     BM25_SEARCH_K,
     CACHE_SIZE,
@@ -52,10 +53,10 @@ def _tokenize(text: str) -> List[str]:
 
 class HybridRetriever:
     def __init__(self):
-        endpoint = os.getenv("ASTRA_DB_API_ENDPOINT")
-        token = os.getenv("ASTRA_DB_APPLICATION_TOKEN")
-        keyspace = os.getenv("ASTRA_DB_KEYSPACE", "default_keyspace")
-        collection_name = os.getenv("ASTRA_DB_COLLECTION", "flipkart_reviews")
+        endpoint = clean_env("ASTRA_DB_API_ENDPOINT")
+        token = clean_env("ASTRA_DB_APPLICATION_TOKEN")
+        keyspace = clean_env("ASTRA_DB_KEYSPACE", "default_keyspace")
+        collection_name = clean_env("ASTRA_DB_COLLECTION", "flipkart_reviews")
         if not endpoint or not token:
             raise ValueError(
                 "Missing AstraDB connection variables "

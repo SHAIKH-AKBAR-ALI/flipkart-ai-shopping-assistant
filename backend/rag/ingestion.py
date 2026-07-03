@@ -7,6 +7,7 @@ import logging
 import pandas as pd
 from typing import List, Dict, Any, Optional
 from llama_index.core import Document
+from env_utils import clean_env
 from rag.models import RAGProduct
 
 logger = logging.getLogger(__name__)
@@ -260,10 +261,10 @@ class ProductDataPipeline:
             return 0
 
         # 2. Get credentials from environment
-        endpoint = os.getenv("ASTRA_DB_API_ENDPOINT")
-        token = os.getenv("ASTRA_DB_APPLICATION_TOKEN")
-        keyspace = os.getenv("ASTRA_DB_KEYSPACE", "default_keyspace")
-        collection = os.getenv("ASTRA_DB_COLLECTION", "flipkart_reviews")
+        endpoint = clean_env("ASTRA_DB_API_ENDPOINT")
+        token = clean_env("ASTRA_DB_APPLICATION_TOKEN")
+        keyspace = clean_env("ASTRA_DB_KEYSPACE", "default_keyspace")
+        collection = clean_env("ASTRA_DB_COLLECTION", "flipkart_reviews")
 
         if not endpoint or not token:
             raise ValueError("Missing AstraDB connection variables (ASTRA_DB_API_ENDPOINT or ASTRA_DB_APPLICATION_TOKEN)")

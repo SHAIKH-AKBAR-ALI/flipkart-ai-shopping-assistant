@@ -18,6 +18,8 @@ import os
 import re
 from typing import Any, Dict, Optional
 
+from env_utils import clean_env
+
 logger = logging.getLogger(__name__)
 
 _MIN_PRICE = 1000.0        # below this for a phone/laptop/TV = almost certainly a parse error
@@ -25,7 +27,7 @@ _MAX_PRICE = 5_000_000.0   # above this = parse error (grabbed a phone number, m
 
 
 def _make_client():
-    api_key = os.getenv("TAVILY_API_KEY")
+    api_key = clean_env("TAVILY_API_KEY")
     if not api_key:
         logger.error("price_lookup: TAVILY_API_KEY not set, skipping web price lookup.")
         return None
